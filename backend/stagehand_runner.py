@@ -43,6 +43,8 @@ async def run_test(changelog: str):
         headless=False,  # Run in headed mode to see the browser
         model_name=model_name,
         verbose=2,  # Medium verbosity
+        api_key=None,  # No Browserbase API key
+        project_id=None,  # No Browserbase project ID
     )
     
     # Create Stagehand client
