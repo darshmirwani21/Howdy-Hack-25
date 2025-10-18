@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  stagehand-backend:
+    build:
+      context: ./backend/llm_backend
+      dockerfile: Dockerfile
+    container_name: stagehand-automation
+    ports:
+      - "443:443"
+    env_file:
+      - ./backend/llm_backend/.env
+    environment:
+      - DISPLAY=:99
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - STAGEHAND_MODEL=${STAGEHAND_MODEL:-tngtech/deepseek-r1t-chimera:free}
+      - STAGEHAND_API_URL=http://localhost:443
+    network_mode: host
+    volumes:
+      - ./backend/llm_backend:/app
+      - ./backend/stagehand_runner.py:/stagehand_runner.py
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    command: >
+      sh -c "rm -f /tmp/.X99-lock &&
+             Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
+             sleep 2 &&
+             cd /app &&
+             uvicorn server:app --host 0.0.0.0 --port 443"
+    restart: unless-stopped
+
+# Environment Variables Required:
+# - OPENROUTER_API_KEY: Your OpenRouter API key
+# - STAGEHAND_MODEL: The model to use (default: tngtech/deepseek-r1t-chimera:free)
+# - STAGEHAND_API_URL: FastAPI backend URL (default: http://localhost:443)
+#
+# Create a .env file in the backend directory with these variables.
+
