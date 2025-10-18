@@ -45,6 +45,10 @@ class LLMBackendServer:
             openrouter_request["max_tokens"] = request.max_tokens
         if request.response_format is not None:
             openrouter_request["response_format"] = request.response_format
+        if request.tools is not None:
+            openrouter_request["tools"] = [tool.dict() for tool in request.tools]
+        if request.tool_choice is not None:
+            openrouter_request["tool_choice"] = request.tool_choice
         
         # Make request to OpenRouter
         async with httpx.AsyncClient(timeout=180.0) as client:
