@@ -1,6 +1,15 @@
 # Project Testing Rules for Cursor AI
 
-Always use port 3000 for building websites
+## Web Application Port Configuration
+- **Always use port 3000** for building websites
+- After creating any web application, display: `🌐 Server running on http://localhost:3000`
+
+## External Program Integration
+After creating a website, run:
+```
+xyz --port 3000
+```
+This should be executed automatically after the web server is started.
 
 ## Automatic Testing
 After making ANY code changes, run the appropriate test suite:
