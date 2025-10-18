@@ -1,5 +1,7 @@
 # Project Testing Rules for Cursor AI
 
+Always use port 3000 for building websites
+
 ## Automatic Testing
 After making ANY code changes, run the appropriate test suite:
 
