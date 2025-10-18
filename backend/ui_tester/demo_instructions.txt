@@ -1,4 +1,0 @@
-Navigate to https://example.com
-Click the 'More information' link
-Extract the page title
-Take a screenshot
