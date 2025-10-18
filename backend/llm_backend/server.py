@@ -1,7 +1,9 @@
 import uvicorn
+import time # --- DEVELOPMENT ---
+import json
 from fastapi import FastAPI, APIRouter, Depends
 from fastapi_utils.cbv import cbv
-from openai_messages.messages import ChatCompletionRequest, ChatCompletionResponse
+from openai_messages.messages import ChatCompletionRequest
 
 router = APIRouter()
 @cbv(router)
@@ -13,13 +15,32 @@ class LLMBackendServer:
     @router.post("/v1/chat/completions")
     def chat_completions(self, request: ChatCompletionRequest):
         # TODO: Return Computer Use formatted response from OpenRouter
-        return ChatCompletionResponse(
-            id=request.id,
-            object="chat.completion",
-            created=request.created,
-            model=request.model,
-            choices=request.choices
-        )
+        # --- DEVELOPMENT ---
+        return {
+            "id": f"chatcmpl-{int(time.time())}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": request.model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Clicking button",
+                    "tool_calls": [{
+                        "id": f"call_{int(time.time())}",
+                        "type": "function",
+                        "function": {
+                            "name": "computer",
+                            "arguments": json.dumps({
+                                "action": "left_click",
+                                "coordinate": [200, 300]
+                            })
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        }
 
 if __name__ == "__main__":
     app = FastAPI()
