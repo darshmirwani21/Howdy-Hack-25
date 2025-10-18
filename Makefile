@@ -14,4 +14,4 @@ down:
 	docker rm $(LLM_BACKEND_IMAGE_NAME) || true
 
 dev: build
-	docker run --rm -p $(LLM_BACKEND_PORT):$(LLM_BACKEND_PORT) $(LLM_BACKEND_IMAGE_NAME)
+	docker run -d --rm -p $(LLM_BACKEND_PORT):$(LLM_BACKEND_PORT) $(LLM_BACKEND_IMAGE_NAME)
