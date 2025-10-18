@@ -12,6 +12,10 @@ class LLMBackendServer:
     @router.get("/")
     def read_root(self):
         return {"message": "LLM Backend is running"}
+    
+    @router.get("/v1")
+    def read_v1(self):
+        return {"message": "LLM Backend v1 is running"}
 
     @router.post("/v1/chat/completions")
     def chat_completions(self, request: ChatCompletionRequest):
