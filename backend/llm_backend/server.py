@@ -20,8 +20,8 @@ class LLMBackendServer:
 
     @router.post("/v1/chat/completions")
     def chat_completions(self, request: ChatCompletionRequest):
-        # TODO: Return Computer Use formatted response from OpenRouter
-        # --- DEVELOPMENT ---
+        # Return proper OpenAI-compatible chat completion response
+        # Stagehand expects standard OpenAI format
         return {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
@@ -31,21 +31,19 @@ class LLMBackendServer:
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": "Clicking button",
-                    "tool_calls": [{
-                        "id": f"call_{int(time.time())}",
-                        "type": "function",
-                        "function": {
-                            "name": "computer",
-                            "arguments": json.dumps({
-                                "action": "left_click",
-                                "coordinate": [200, 300]
-                            })
-                        }
-                    }]
+                    "content": json.dumps({
+                        "action": "click",
+                        "selector": "button",
+                        "reasoning": "Clicking the button as requested"
+                    })
                 },
-                "finish_reason": "tool_calls"
-            }]
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150
+            }
         }
 
 app = FastAPI()
