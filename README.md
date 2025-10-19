@@ -26,7 +26,20 @@ In essence, we prevent bugs in AI generated code.
 - **Multi-step Workflows**: Complex user journey testing
 - **Visual Regression Detection**: Catch UI bugs before they reach production
 
-##  Quick Start
+##  Quick Start - MCP
+- **MCP Functionality**: Lumen is also an MCP server, accessible to Copilot and Windsurf via the MCP Store!
+- **Download**: Download the repo, and set the path to where you put it.
+- **Add it in**: Just paste in the custom JSON into your MCP directory:
+- "lumen": {
+      "command": "node",
+      "args": ["/Users/arjunbabla/GitHub/Howdy-Hack-25/mcp-server/src/index.js"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
+      }
+    }
+- **Screenshot Automation**: Add in your key, and done!
+
+##  Quick Start - Terminal
 
 ### 1. **Install Dependencies**
 ```bash
