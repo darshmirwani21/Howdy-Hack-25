@@ -37,7 +37,7 @@ In essence, we prevent bugs in AI generated code.
         "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
       }
     }
-- **Screenshot Automation**: Add in your key, and done!
+- **Finished**: Add in your key, and done!
 
 ##  Quick Start - Terminal
 
