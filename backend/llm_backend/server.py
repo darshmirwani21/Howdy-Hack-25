@@ -2,6 +2,7 @@ import uvicorn
 import time # --- DEVELOPMENT ---
 import json
 import asyncio
+from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter, Depends
 from fastapi_utils.cbv import cbv
 from openai_messages.messages import ChatCompletionRequest
@@ -51,4 +52,5 @@ app = FastAPI()
 app.include_router(router)
 
 if __name__ == "__main__":
+    load_dotenv()
     uvicorn.run(app, host="0.0.0.0", port=443)
