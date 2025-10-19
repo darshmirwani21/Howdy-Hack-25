@@ -24,8 +24,20 @@ async def run_test(changelog: str):
         changelog: Detailed AI-generated changelog describing what to test
     """
     # Get configuration from environment
-    stagehand_api_url = os.getenv("STAGEHAND_API_URL", "http://localhost:443")
-    model_name = os.getenv("STAGEHAND_MODEL", "tngtech/deepseek-r1t-chimera:free")
+    use_agent = os.getenv("USE_AGENT", "false").lower() == "true"
+    
+    if use_agent:
+        stagehand_api_url = os.getenv("STAGEHAND_API_URL", "http://localhost:443")
+        model_name = os.getenv("STAGEHAND_MODEL", "tngtech/deepseek-r1t-chimera:free")
+        model_api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("MODEL_API_KEY")
+        
+        if not model_api_key:
+            print("❌ Error: MODEL_API_KEY or OPENROUTER_API_KEY environment variable is required for agent mode")
+            print("Please set your OpenRouter API key:")
+            print("  export OPENROUTER_API_KEY='your-api-key-here'")
+            print("\nOr run without agent mode (basic browser automation only):")
+            print("  export USE_AGENT=false")
+            sys.exit(1)
     
     # Target URL - using microsoft.com for testing
     target_url = "https://www.microsoft.com"
@@ -33,24 +45,35 @@ async def run_test(changelog: str):
     print(f"🚀 Starting Stagehand Browser Automation")
     print(f"📋 Changelog: {changelog}")
     print(f"🌐 Target URL: {target_url}")
-    print(f"🤖 Model: {model_name}")
-    print(f"🔗 API URL: {stagehand_api_url}")
+    print(f"🤖 Agent Mode: {'Enabled' if use_agent else 'Disabled (Basic automation only)'}")
+    if use_agent:
+        print(f"🤖 Model: {model_name}")
+        print(f"🔗 API URL: {stagehand_api_url}")
     print("-" * 80)
     
     # Initialize Stagehand configuration
-    config = StagehandConfig(
-        env="LOCAL",  # Run local browser, not Browserbase
-        headless=False,  # Run in headed mode to see the browser
-        model_name=model_name,
-        verbose=2,  # Medium verbosity
-        api_key=None,  # No Browserbase API key
-        project_id=None,  # No Browserbase project ID
-    )
+    if use_agent:
+        config = StagehandConfig(
+            env="LOCAL",  # Run local browser, not Browserbase
+            headless=False,  # Run in headed mode to see the browser
+            verbose=2,  # Medium verbosity
+            model_name=model_name,
+            model_api_key=model_api_key,  # API key for the LLM (OpenRouter)
+            model_client_options={
+                "base_url": stagehand_api_url,
+            }
+        )
+    else:
+        # Minimal config without AI - just basic browser automation
+        config = StagehandConfig(
+            env="LOCAL",  # Run local browser, not Browserbase
+            headless=False,  # Run in headed mode to see the browser
+            verbose=2,  # Medium verbosity
+        )
     
     # Create Stagehand client
     stagehand = Stagehand(
         config=config,
-        server_url=stagehand_api_url,  # Point to our FastAPI backend
     )
     
     try:
@@ -65,21 +88,43 @@ async def run_test(changelog: str):
         await page.goto(target_url)
         print("✅ Page loaded successfully")
         
-        # Create agent for autonomous testing
-        print("🤖 Creating Stagehand agent...")
-        agent = stagehand.agent()
-        print("✅ Agent created")
-        
-        # Execute test based on changelog
-        print("\n🧪 Starting automated testing...")
-        print(f"📝 Test description: {changelog}")
-        print("-" * 80)
-        
-        result = await agent.execute(changelog)
-        
-        print("-" * 80)
-        print("✅ Testing completed successfully!")
-        print(f"📊 Result: {result}")
+        if use_agent:
+            # Create agent for autonomous testing
+            print("🤖 Creating Stagehand agent...")
+            agent = stagehand.agent()
+            print("✅ Agent created")
+            
+            # Execute test based on changelog
+            print("\n🧪 Starting automated testing...")
+            print(f"📝 Test description: {changelog}")
+            print("-" * 80)
+            
+            result = await agent.execute(changelog)
+            
+            print("-" * 80)
+            print("✅ Testing completed successfully!")
+            print(f"📊 Result: {result}")
+        else:
+            # Basic automation test without AI
+            print("\n🧪 Performing basic browser automation test...")
+            print(f"📝 Description: {changelog}")
+            print("-" * 80)
+            
+            # Get page title
+            title = await page.title()
+            print(f"📄 Page Title: {title}")
+            
+            # Get page URL
+            url = page.url
+            print(f"🔗 Current URL: {url}")
+            
+            # Wait a bit to see the page
+            print("⏳ Waiting 3 seconds for you to see the page...")
+            await asyncio.sleep(3)
+            
+            print("-" * 80)
+            print("✅ Basic automation test completed successfully!")
+            print("🎉 Stagehand is working! You can now enable agent mode with USE_AGENT=true")
         
     except Exception as e:
         print(f"❌ Error during testing: {str(e)}")
