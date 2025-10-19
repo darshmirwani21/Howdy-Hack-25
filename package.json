@@ -16,11 +16,15 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "ui": "electron electron/main.cjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^2.5.2",
     "commander": "^14.0.1",
     "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
   }
 }

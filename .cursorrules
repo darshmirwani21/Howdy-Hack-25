@@ -4,6 +4,35 @@
 - **Always use port 3000** for building websites
 - After creating any web application, display: `🌐 Server running on http://localhost:3000`
 
+## Automated UI Testing with Stagehand
+
+After creating or modifying web UI code:
+
+### CLI Mode (Quick Testing)
+```bash
+# Single action (backward compatible)
+node index.js --url "http://localhost:3000" --action "click submit button"
+
+# Multi-action prompt (recommended)
+node index.js --url "http://localhost:3000" --prompt "Navigate to login. Fill username with test. Click submit"
+
+# Verbose mode for detailed output
+node index.js --url "http://localhost:3000" --prompt "Test login flow" --verbose
+```
+
+### UI Mode (Visual Dashboard)
+```bash
+npm run ui
+```
+Then enter URL and prompt in the dashboard for real-time visual feedback.
+
+### Test Result Interpretation
+- Read stdout text summary for quick overview
+- Check JSON file (`test-results-*.json`) for detailed programmatic access
+- Review screenshots in `./screenshots/` directory
+- Analyze observations for page state after each action
+- Use failures to identify code issues and suggest fixes
+
 ## External Program Integration
 After creating a website, run:
 ```

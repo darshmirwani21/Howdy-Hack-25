@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Stagehand Test Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>🤘 Stagehand Test Dashboard</h1>
+      <div class="status" id="status">Ready</div>
+    </header>
+    
+    <!-- Input Section -->
+    <section class="input-section">
+      <input type="text" id="url-input" placeholder="http://localhost:3000" value="http://localhost:3000" />
+      <input type="text" id="prompt-input" placeholder="Navigate to login. Fill username. Click submit" />
+      <button id="run-btn">Run Test</button>
+    </section>
+    
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+      <!-- Left: Browser View Placeholder -->
+      <div class="panel browser-view">
+        <h2>Browser View</h2>
+        <div id="browser-placeholder">
+          <p>Browser automation in progress...</p>
+          <div id="current-screenshot"></div>
+        </div>
+      </div>
+      
+      <!-- Middle: Action Feed -->
+      <div class="panel action-feed">
+        <h2>Action Feed</h2>
+        <div id="action-list"></div>
+      </div>
+      
+      <!-- Right: Test Results -->
+      <div class="panel test-results">
+        <h2>Test Results</h2>
+        <div id="results-summary"></div>
+        <div id="results-details"></div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
+
