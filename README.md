@@ -32,7 +32,7 @@ In essence, we prevent bugs in AI generated code.
 - **Add it in**: Just paste in the custom JSON into your MCP directory:
 - "lumen": {
       "command": "node",
-      "args": ["/Users/arjunbabla/GitHub/Howdy-Hack-25/mcp-server/src/index.js"],
+      "args": ["~/Howdy-Hack-25/mcp-server/src/index.js"],
       "env": {
         "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
       }
