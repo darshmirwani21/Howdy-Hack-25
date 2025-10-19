@@ -16,7 +16,7 @@ After making ANY code changes, run the appropriate test suite:
 
 ### Python Files
 ```
-python test_runner.py
+python test_agent.py
 ```
 
 ### JavaScript/TypeScript Files

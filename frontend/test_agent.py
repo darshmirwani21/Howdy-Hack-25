@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import logging
 from stagehand import Stagehand
+from stagehand.config import StagehandConfig
 from pydantic import BaseModel
 
 # Configure logging
@@ -78,21 +79,14 @@ class HowdyTestAgent:
             logger.info("Initializing Stagehand...")
             
             # Initialize Stagehand with configuration parameters directly
-            self.stagehand = Stagehand(
-                env="LOCAL",
-                api_key=("your-api-key" if not os.getenv("BROWSERBASE_API_KEY") else os.getenv("BROWSERBASE_API_KEY")),
-                project_id=("your-project-id" if not os.getenv("BROWSERBASE_PROJECT_ID") else os.getenv("BROWSERBASE_PROJECT_ID")),
-                model_name="gpt-4o",
-                model_client_options={
-                    "base_url": f"http://localhost:{self.backend_port}/v1",
-                },
-                headless=False,
-                verbose=2,  # Detailed logging for debugging
-                use_rich_logging=True,
-                dom_settle_timeout_ms=3000,
-                enable_caching=False,  # Disable caching for testing
-                self_heal=True,  # Enable self-healing
+            config = StagehandConfig(
+               env="LOCAL",
+               api_key="dummy-openai-key",
+               model_name="openai/gpt-4",
+               headless=False,
             )
+            
+            self.stagehand = Stagehand(config=config)
             
             await self.stagehand.init()
             self.page = self.stagehand.page
@@ -230,14 +224,11 @@ class HowdyTestAgent:
         
         try:
             # Create agent instance with configuration
+            # API key and base URL are already configured in initialize_stagehand()
             agent = self.stagehand.agent({
                 'provider': 'openai',
                 'model': 'gpt-4o',
-                'instructions': 'Execute web testing scenarios and report results',
-                'options': {
-                    'apiKey': os.getenv("MODEL_API_KEY") or os.getenv("OPENAI_API_KEY"),
-                    'baseURL': f"http://localhost:{self.backend_port}/v1"
-                }
+                'instructions': 'Execute web testing scenarios and report results'
             })
             
             logger.info("Agent instance created successfully")
