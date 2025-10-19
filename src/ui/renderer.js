@@ -5,8 +5,19 @@ const viewportInfo = document.getElementById('viewport-info');
 const screenshotsContainer = document.getElementById('screenshots-container');
 const feedbackContainer = document.getElementById('feedback-container');
 const screenshotCount = document.getElementById('screenshot-count');
+const modal = document.getElementById('screenshot-modal');
+const modalImage = document.getElementById('modal-image');
+const modalCritiqueContent = document.getElementById('modal-critique-content');
+const modalClose = document.getElementById('modal-close');
+const logo = document.getElementById('logo');
 
 let screenshotCounter = 0;
+let screenshotData = {}; // Store screenshot data for modal
+
+// Check if logo exists
+if (logo && logo.complete && logo.naturalWidth > 0) {
+  logo.style.display = 'block';
+}
 
 // Simple markdown to HTML converter
 function markdownToHTML(markdown) {
@@ -51,7 +62,36 @@ function markdownToHTML(markdown) {
   return html;
 }
 
-// Setup IPC listeners (like html_streaming does)
+// Modal functions
+function openModal(step) {
+  const data = screenshotData[step];
+  if (!data) return;
+  
+  modalImage.src = `data:image/png;base64,${data.image}`;
+  modalCritiqueContent.innerHTML = markdownToHTML(data.critique || 'Analyzing...');
+  modal.classList.add('show');
+}
+
+function closeModal() {
+  modal.classList.remove('show');
+}
+
+// Modal event listeners
+modalClose.addEventListener('click', closeModal);
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) {
+    closeModal();
+  }
+});
+
+// Keyboard shortcut to close modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modal.classList.contains('show')) {
+    closeModal();
+  }
+});
+
+// Setup IPC listeners
 function setupIPCListeners() {
   console.log('Setting up IPC listeners...');
   
@@ -93,6 +133,9 @@ function handleMessage(data) {
     case 'complete':
       handleComplete(data);
       break;
+    case 'close':
+      handleClose();
+      break;
     default:
       console.log('Unknown message type:', data.type);
   }
@@ -125,7 +168,7 @@ function handleViewport(data) {
   }
   
   // Update viewport display
-  viewportStream.innerHTML = `<img src="data:image/png;base64,${image}" alt="Browser viewport" style="width: 100%; height: 100%; object-fit: contain;">`;
+  viewportStream.innerHTML = `<img src="data:image/png;base64,${image}" alt="Browser viewport">`;
   
   // Update URL info
   if (url) {
@@ -137,33 +180,33 @@ function handleViewport(data) {
 function handleScreenshot(data) {
   const { image, step, prefix, filename } = data;
   
-  console.log(`📸 Received ${prefix} screenshot for step ${step}, image length:`, image ? image.length : 0);
+  console.log(`📸 Received ${prefix} screenshot for step ${step}`);
+  
+  // Store screenshot data
+  screenshotData[step] = { image, critique: null };
   
   // Remove placeholder if it exists
   const placeholder = screenshotsContainer.querySelector('.placeholder');
   if (placeholder) {
-    console.log('Removing placeholder from screenshots container');
     screenshotsContainer.removeChild(placeholder);
   }
 
-  // Create screenshot item
+  // Create screenshot thumbnail
   const item = document.createElement('div');
   item.className = 'screenshot-item';
   item.id = `screenshot-${step}`;
-  
-  const label = prefix === 'before' ? '📸 Before Action' : '📸 After Action';
+  item.onclick = () => openModal(step);
   
   item.innerHTML = `
-    <div class="screenshot-header">${label} - Step ${step}</div>
-    <img src="data:image/png;base64,${image}" alt="${filename}" class="screenshot-image">
-    <div class="screenshot-critique loading">
+    <div class="screenshot-header">Step ${step}</div>
+    <img src="data:image/png;base64,${image}" alt="${filename}" class="screenshot-thumbnail">
+    <div class="screenshot-status">
       <div class="mini-spinner"></div>
-      <span>Analyzing screenshot with AI...</span>
+      <span>Analyzing...</span>
     </div>
   `;
   
   screenshotsContainer.appendChild(item);
-  console.log(`Added screenshot item to DOM, total items: ${screenshotsContainer.children.length}`);
   
   // Update counter
   screenshotCounter++;
@@ -179,17 +222,16 @@ function handleCritique(data) {
   
   console.log(`Received critique for step ${step}`);
   
-  // Find the corresponding screenshot item
+  // Update stored data
+  if (screenshotData[step]) {
+    screenshotData[step].critique = critique;
+  }
+  
+  // Update thumbnail status
   const item = document.getElementById(`screenshot-${step}`);
   if (item) {
-    const critiqueDiv = item.querySelector('.screenshot-critique');
-    critiqueDiv.className = 'screenshot-critique';
-    // Convert markdown to HTML for better formatting
-    const critiqueHTML = markdownToHTML(critique);
-    critiqueDiv.innerHTML = `
-      <h4>🔍 AI Critique:</h4>
-      <div>${critiqueHTML}</div>
-    `;
+    const statusDiv = item.querySelector('.screenshot-status');
+    statusDiv.innerHTML = '<span>Analysis complete</span>';
   }
 }
 
@@ -205,7 +247,7 @@ function handleSummary(data) {
     feedbackContainer.removeChild(placeholder);
   }
   
-  // Convert markdown to HTML for better formatting
+  // Convert markdown to HTML
   const summaryHTML = markdownToHTML(summary);
   
   // Add summary content
@@ -222,10 +264,14 @@ function handleComplete(data) {
   console.log('Test completed:', data);
 }
 
+// Handle close signal
+function handleClose() {
+  console.log('Received close signal, closing window...');
+  window.close();
+}
+
 // Initialize IPC listeners when page loads
 window.addEventListener('DOMContentLoaded', () => {
   console.log('Renderer loaded, setting up IPC listeners...');
   setupIPCListeners();
 });
-
-

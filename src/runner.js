@@ -90,13 +90,12 @@ function startWebSocketServer(port) {
 // Spawn Electron UI
 function spawnElectronUI(port) {
   // Look for electron in root node_modules (parent directory)
-  const electronPath = path.join(mainFolderPath, 'node_modules', '.bin', 'electron.cmd');
+  const electronPath = path.join(mainFolderPath, 'node_modules', '.bin', 'electron');
   const mainPath = path.join(__dirname, 'ui', 'main.cjs');
   
   const electron = spawn(electronPath, [mainPath], {
     env: { ...process.env, WS_PORT: port },
-    stdio: 'inherit',
-    shell: true
+    stdio: 'inherit'
   });
   
   electron.on('error', (err) => {
@@ -126,13 +125,18 @@ function parseArguments() {
       ui: {
         type: 'boolean',
         default: false
+      },
+      agent: {
+        type: 'boolean',
+        short: 'a',
+        default: false
       }
     }
   });
 
   if (!values.url || !values.test) {
-    console.error('❌ Error: Both --url and --test arguments are required\n');
-    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--screenshots] [--ui]\n');
+    console.error('Error: Both --url and --test arguments are required\n');
+    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--ui]\n');
     console.log('Examples:');
     console.log('  node runner.js --url https://example.com --test "Click the login button"');
     console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --screenshots');
@@ -144,7 +148,8 @@ function parseArguments() {
     url: values.url,
     test: values.test,
     captureScreenshots: values.screenshots,
-    useUI: values.ui
+    useUI: values.ui,
+    useAgent: values.agent
   };
 }
 
@@ -162,7 +167,7 @@ async function saveScreenshot(page, runFolder, prefix, stepNumber) {
   const filepath = path.join(runFolder, filename);
   
   await page.screenshot({ path: filepath, fullPage: true });
-  console.log(`📸 Screenshot saved: ${filename}`);
+  console.log(`Screenshot saved: ${filename}`);
   
   // Read screenshot as base64 for UI
   const imageBuffer = await fs.readFile(filepath);
@@ -175,7 +180,7 @@ async function saveScreenshot(page, runFolder, prefix, stepNumber) {
 async function saveTerminalOutput(runFolder, output) {
   const filepath = path.join(runFolder, 'terminal_output.txt');
   await fs.writeFile(filepath, output.join('\n'), 'utf-8');
-  console.log(`📝 Terminal output saved: terminal_output.txt`);
+  console.log(`Terminal output saved: terminal_output.txt`);
 }
 
 // Vision Model Analysis - Single screenshot
@@ -193,21 +198,24 @@ async function critiqueScreenshot(screenshotPath, openrouterApiKey) {
         'X-Title': 'Stagehand UI Analysis'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: `Analyze this UI screenshot critically. Check for:
-- Visual design issues (colors, typography, spacing, alignment, contrast)
-- Layout problems (broken elements, misalignment, overlap)
-- Accessibility concerns (text readability, color contrast, sizing)
-- UX issues (confusing navigation, missing elements, poor hierarchy)
-- Any bugs or visual glitches
+                text: `Analyze this UI screenshot. Be concise and constructive.
 
-Be specific and detailed. Point out exactly what's wrong or what's done well.`
+**Format your response as:**
+
+## Pros
+- List what's working well (design, UX, accessibility, visual hierarchy)
+
+## Cons  
+- List any issues (visual glitches, layout problems, UX issues, accessibility concerns)
+
+**Important:** If the design is good overall, say so! Only critique actual problems. Be specific but brief.`
               },
               {
                 type: 'image_url',
@@ -218,7 +226,7 @@ Be specific and detailed. Point out exactly what's wrong or what's done well.`
             ]
           }
         ],
-        max_tokens: 800
+        max_tokens: 500
       })
     });
 
@@ -230,7 +238,7 @@ Be specific and detailed. Point out exactly what's wrong or what's done well.`
     
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('⚠️  Failed to get vision model critique:', error.message);
+    console.error('Failed to get vision model critique:', error.message);
     return 'Vision model analysis failed: ' + error.message;
   }
 }
@@ -238,7 +246,7 @@ Be specific and detailed. Point out exactly what's wrong or what's done well.`
 // Vision Model Analysis - All screenshots in one call
 async function analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey) {
   try {
-    console.log('\n🔍 Running vision model analysis on all screenshots...');
+    console.log('\nRunning vision model analysis on all screenshots...');
     
     // Read all screenshots and convert to base64
     const imageContents = [];
@@ -257,15 +265,20 @@ async function analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey) {
     const messageContent = [
       {
         type: 'text',
-        text: `Analyze these UI screenshots (before and after) critically. Compare them and check for:
-- Visual design issues (colors, typography, spacing, alignment, contrast)
-- Layout problems (broken elements, misalignment, overlap)
-- Changes between before/after states
-- Accessibility concerns (text readability, color contrast, sizing)
-- UX issues (confusing navigation, missing elements, poor hierarchy)
-- Any bugs or visual glitches introduced
+        text: `Analyze these UI screenshots from a test workflow. Be concise and constructive.
 
-Be specific and detailed. Point out exactly what changed and whether it's an improvement or regression.`
+**Format your response as:**
+
+## Overall Assessment
+Brief summary of the UI journey and quality
+
+## Pros
+- What's working well across the pages
+
+## Cons
+- Any issues or concerns found
+
+**Important:** If the design is good, say so! Focus on actual problems, not nitpicks. Be specific but brief.`
       },
       ...imageContents
     ];
@@ -279,57 +292,11 @@ Be specific and detailed. Point out exactly what changed and whether it's an imp
         'X-Title': 'Stagehand UI Analysis'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'user',
             content: messageContent
-          }
-        ],
-        max_tokens: 1000
-      })
-    });
-
-    const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(data.error.message || JSON.stringify(data.error));
-    }
-    
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('⚠️  Failed to get vision model critique:', error.message);
-    return 'Vision model analysis failed: ' + error.message;
-  }
-}
-
-// Summary Analysis with GPT-4o-mini
-async function generateSummary(visionCritique, terminalOutput, openrouterApiKey) {
-  try {
-    console.log('🔍 Generating summary with GPT-4o-mini...\n');
-    
-    const prompt = `You are analyzing browser testing results. Based on the screenshot feedback and terminal output, summarize what's wrong and what can be improved. If it's actually good, say that.
-
-SCREENSHOT FEEDBACK:
-${visionCritique}
-
-TERMINAL OUTPUT:
-${terminalOutput.join('\n')}`;
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openrouterApiKey}`,
-        'HTTP-Referer': 'https://github.com/browserbase/stagehand',
-        'X-Title': 'Stagehand Test Summary'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
           }
         ],
         max_tokens: 800
@@ -344,20 +311,87 @@ ${terminalOutput.join('\n')}`;
     
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('⚠️  Failed to generate summary:', error.message);
+    console.error('Failed to get vision model critique:', error.message);
+    return 'Vision model analysis failed: ' + error.message;
+  }
+}
+
+// Summary Analysis with GPT-5-mini
+async function generateSummary(visionCritique, terminalOutput, openrouterApiKey) {
+  try {
+    console.log('Generating summary...\n');
+    
+    const prompt = `Analyze these browser testing results. Be concise and actionable.
+
+**Format your response as:**
+
+## Test Summary
+Brief overview of what was tested
+
+## UI Quality
+Your assessment based on the visual analysis
+
+## Pros
+- What's working well
+
+## Cons
+- Issues found (if any)
+
+## Recommendations
+- Key action items (if needed)
+
+**Important:** If everything looks good, say so! Be honest and constructive.
+
+---
+
+VISUAL ANALYSIS:
+${visionCritique}
+
+TEST LOG (last 50 lines):
+${terminalOutput.slice(-50).join('\n')}`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterApiKey}`,
+        'HTTP-Referer': 'https://github.com/browserbase/stagehand',
+        'X-Title': 'Stagehand Test Summary'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-5-mini',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 600
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || JSON.stringify(data.error));
+    }
+    
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('Failed to generate summary:', error.message);
     return 'Summary generation failed: ' + error.message;
   }
 }
 
 async function runTest() {
-  const { url, test, captureScreenshots, useUI } = parseArguments();
+  const { url, test, captureScreenshots, useUI, useAgent } = parseArguments();
 
   // Validate environment variables
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-  const modelName = process.env.STAGEHAND_MODEL || 'openai/gpt-4o-mini';
+  const modelName = process.env.STAGEHAND_MODEL || 'openai/gpt-5-mini';
 
   if (!openrouterApiKey) {
-    console.error('❌ Error: OPENROUTER_API_KEY environment variable is required');
+    console.error('Error: OPENROUTER_API_KEY environment variable is required');
     console.error('Please set it in your .env file or environment\n');
     process.exit(1);
   }
@@ -366,7 +400,7 @@ async function runTest() {
   if (useUI) {
     process.env.PLAYWRIGHT_HEADLESS = '1';
     process.env.HEADLESS = 'true';
-    console.log('🔇 Browser will run in headless mode (no window)\n');
+    console.log('Browser will run in headless mode (no window)\n');
   }
 
   // Start WebSocket server and Electron UI if requested
@@ -374,7 +408,7 @@ async function runTest() {
   if (useUI) {
     const wsPort = 9876;
     await startWebSocketServer(wsPort);
-    console.log('🚀 Starting Electron UI...');
+    console.log('Starting Electron UI...');
     electronProcess = spawnElectronUI(wsPort);
     // Wait a bit for Electron to start
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -391,18 +425,18 @@ async function runTest() {
   
   if (captureScreenshots) {
     runFolder = await createRunFolder();
-    console.log(`📁 Run folder created: ${runFolder}\n`);
+    console.log(`Run folder created: ${runFolder}\n`);
   }
 
-  console.log('🚀 Starting Stagehand Browser Automation');
-  console.log('='.repeat(80));
-  console.log(`🌐 Target URL: ${url}`);
-  console.log(`🧪 Test: ${test}`);
-  console.log(`🤖 Model: ${modelName}`);
-  console.log(`🎯 Mode: Observe + Act (multi-step)`);
-  console.log(`📸 Screenshots: ${captureScreenshots ? 'Enabled' : 'Disabled'}`);
-  console.log(`🖥️  UI Dashboard: ${useUI ? 'Enabled' : 'Disabled'}`);
-  console.log('='.repeat(80));
+  console.log('Starting Stagehand Browser Automation');
+  console.log('=' .repeat(80));
+  console.log(`Target URL: ${url}`);
+  console.log(`Test: ${test}`);
+  console.log(`Model: ${modelName}`);
+  console.log(`Mode: ${useAgent ? 'Computer Use Agent (CU)' : 'Normal (single action)'}`);
+  console.log(`Screenshots: ${captureScreenshots ? 'Enabled' : 'Disabled'}`);
+  console.log(`UI Dashboard: ${useUI ? 'Enabled' : 'Disabled'}`);
+  console.log('=' .repeat(80));
 
   // Send initial status to UI
   sendToUI({ type: 'status', message: 'Initializing...', url: null });
@@ -427,21 +461,21 @@ async function runTest() {
 
   try {
     // Initialize Stagehand
-    console.log('\n🔧 Initializing Stagehand...');
+    console.log('\nInitializing Stagehand...');
     sendToUI({ type: 'status', message: 'Initializing Stagehand...' });
     await stagehand.init();
-    console.log('✅ Stagehand initialized\n');
+    console.log('Stagehand initialized\n');
 
     // Navigate to URL
-    console.log(`🌐 Navigating to ${url}...`);
+    console.log(`Navigating to ${url}...`);
     sendToUI({ type: 'status', message: `Navigating to ${url}...`, url });
     await stagehand.page.goto(url);
-    console.log('✅ Page loaded\n');
+    console.log('Page loaded\n');
     sendToUI({ type: 'status', message: 'Page loaded', url });
 
     // Start CDP screencast for live UI preview
     if (useUI) {
-      console.log('📹 Starting CDP screencast for live UI...');
+      console.log('Starting CDP screencast for live UI...');
       cdpSession = await stagehand.context.newCDPSession(stagehand.page);
       
       await cdpSession.send('Page.startScreencast', {
@@ -465,46 +499,107 @@ async function runTest() {
         await cdpSession.send('Page.screencastFrameAck', { sessionId });
       });
 
-      console.log('✅ CDP screencast started\n');
-      console.log(`🔌 Connected UI clients: ${wsClients.length}`);
+      console.log('CDP screencast started\n');
+      console.log(`Connected UI clients: ${wsClients.length}`);
       
       // Add error handling for CDP session
       cdpSession.on('disconnected', () => {
-        console.log('⚠️  CDP session disconnected');
+        console.log('CDP session disconnected');
       });
     }
 
-    // Capture "before" screenshot
+    // Setup screenshot capture on URL change
     if (captureScreenshots) {
-      stepCounter++;
-      console.log('📸 Capturing BEFORE screenshot...');
-      sendToUI({ type: 'status', message: 'Capturing BEFORE screenshot...' });
+      let lastUrl = url;
+      let screenshotTimer = null;
       
-      const { filepath, filename, base64Image } = await saveScreenshot(stagehand.page, runFolder, 'before', stepCounter);
-      screenshotPaths.push(filepath);
+      // Capture screenshot after page settles
+      const captureScreenshot = async (urlAtScheduleTime) => {
+        stepCounter++;
+        console.log(`Page navigated to ${urlAtScheduleTime} - capturing full page screenshot...`);
+        sendToUI({ type: 'status', message: 'Capturing screenshot...' });
+        
+        try {
+          const { filepath, filename, base64Image } = await saveScreenshot(stagehand.page, runFolder, 'step', stepCounter);
+          screenshotPaths.push(filepath);
+          
+          // Send to UI
+          sendToUI({ 
+            type: 'screenshot', 
+            image: base64Image, 
+            step: stepCounter, 
+            prefix: 'step',
+            filename 
+          });
+          
+          // Run critique in parallel (non-blocking)
+          if (useUI) {
+            console.log('Running AI critique in parallel...');
+            critiqueScreenshot(filepath, openrouterApiKey).then(critique => {
+              sendToUI({ type: 'critique', step: stepCounter, critique });
+              console.log(`Critique complete for step ${stepCounter}\n`);
+            }).catch(err => {
+              console.error(`Critique failed for step ${stepCounter}:`, err.message);
+            });
+          }
+        } catch (error) {
+          console.error('Failed to capture screenshot:', error.message);
+        }
+      };
       
-      // Send to UI
-      sendToUI({ 
-        type: 'screenshot', 
-        image: base64Image, 
-        step: stepCounter, 
-        prefix: 'before',
-        filename 
+      // Debounced screenshot scheduler
+      const scheduleScreenshot = (urlToCapture) => {
+        // Clear any pending screenshot
+        if (screenshotTimer) {
+          clearTimeout(screenshotTimer);
+        }
+        
+        // Schedule screenshot after 0.5s (handles redirects)
+        screenshotTimer = setTimeout(async () => {
+          const finalUrl = stagehand.page.url();
+          // Only capture if URL is still the same (no more redirects)
+          if (finalUrl === urlToCapture) {
+            await captureScreenshot(finalUrl);
+          }
+        }, 500);
+      };
+      
+      // Capture initial page
+      scheduleScreenshot(url);
+      
+      // Listen for page navigations
+      stagehand.page.on('framenavigated', async (frame) => {
+        if (frame === stagehand.page.mainFrame()) {
+          const currentUrl = stagehand.page.url();
+          if (currentUrl !== lastUrl) {
+            lastUrl = currentUrl;
+            scheduleScreenshot(currentUrl);
+          }
+        }
       });
-      
-      // Run critique immediately (real-time)
-      if (useUI) {
-        console.log('🔍 Running AI critique...');
-        const critique = await critiqueScreenshot(filepath, openrouterApiKey);
-        sendToUI({ type: 'critique', step: stepCounter, critique });
-        console.log(`✅ Critique complete\n`);
-      }
     }
 
     // Run the test using observe + act pattern
     sendToUI({ type: 'status', message: 'Running test...' });
     
-    console.log('🤖 Starting Observe + Act pattern...');
+
+    if (useAgent) {
+      // Computer Use (CU) Agent Mode - Multi-step autonomous
+      console.log('Starting Computer Use Agent (multi-step autonomous)...');
+      console.log('-'.repeat(80));
+      
+      const agent = stagehand.agent({
+        model: modelName
+      });
+      
+      const result = await agent.execute(test);
+      
+      console.log('-'.repeat(80));
+      console.log('Computer Use Agent completed!\n');
+      console.log('Result:', result);
+    } else {
+      // Normal Mode - Observe + Act pattern
+      console.log('🤖 Starting Observe + Act pattern...');
     console.log('-'.repeat(80));
     
     const page = stagehand.page;
@@ -579,13 +674,14 @@ async function runTest() {
         console.log(`✅ Critique complete\n`);
       }
     }
+    }
 
     // Give time to see the result
-    console.log('\n⏳ Waiting 5 seconds before closing...');
+    console.log('\nWaiting 5 seconds before closing...');
     await new Promise(resolve => setTimeout(resolve, 5000));
 
   } catch (error) {
-    console.error('\n❌ Error during test:', error.message);
+    console.error('\nError during test:', error.message);
     if (error.stack) {
       console.error('\nStack trace:', error.stack);
     }
@@ -595,7 +691,7 @@ async function runTest() {
     if (cdpSession) {
       try {
         await cdpSession.send('Page.stopScreencast');
-        console.log('✅ CDP screencast stopped');
+        console.log('CDP screencast stopped');
       } catch (e) {
         // Ignore errors during cleanup
       }
@@ -604,19 +700,19 @@ async function runTest() {
     // Clean up
     console.log('\n🧹 Cleaning up...');
     await stagehand.close();
-    console.log('✅ Browser closed\n');
+    console.log('Browser closed\n');
 
     // AI Analysis Pipeline (only if screenshots were captured)
     if (captureScreenshots && screenshotPaths.length > 0) {
-      console.log('='.repeat(80));
-      console.log('🤖 STARTING AI ANALYSIS PIPELINE');
-      console.log('='.repeat(80) + '\n');
+      console.log('=' .repeat(80));
+      console.log('STARTING AI ANALYSIS PIPELINE');
+      console.log('=' .repeat(80) + '\n');
 
       // Stage 1: Vision Model Analysis (batch mode for terminal output)
       const visionCritique = await analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey);
       
       console.log('═'.repeat(80));
-      console.log('👁️  VISION MODEL CRITIQUE:');
+      console.log('VISION MODEL CRITIQUE:');
       console.log('═'.repeat(80));
       console.log(visionCritique);
       console.log('═'.repeat(80) + '\n');
@@ -625,8 +721,10 @@ async function runTest() {
       sendToUI({ type: 'status', message: 'Generating final summary...' });
       const summary = await generateSummary(visionCritique, terminalOutput, openrouterApiKey);
       
-      console.log('═'.repeat(80));
-      console.log('📋 FINAL SUMMARY:');
+      // Print summary to terminal (restored console)
+      restoreConsole();
+      console.log('\n' + '═'.repeat(80));
+      console.log('FINAL SUMMARY:');
       console.log('═'.repeat(80));
       console.log(summary);
       console.log('═'.repeat(80) + '\n');
@@ -638,25 +736,41 @@ async function runTest() {
       await saveTerminalOutput(runFolder, terminalOutput);
 
       // Final output
-      console.log('📁 All files saved to:', runFolder);
+      console.log('All files saved to:', runFolder);
+    } else {
+      // Restore console if no screenshots
+      restoreConsole();
     }
 
     // Send completion signal
     sendToUI({ type: 'complete', message: 'Test completed' });
 
-    // Restore console
-    restoreConsole();
-
-    // Keep process alive if UI is running
+    // Auto-close UI and exit after 2 seconds
     if (useUI && electronProcess) {
-      console.log('\n✅ Test complete. UI will remain open. Close the Electron window to exit.\n');
-      // Don't exit, let Electron control the lifecycle
-    } else {
-      // Close WebSocket server if it exists
-      if (wss) {
-        wss.close();
+      console.log('\nTest complete. Closing UI in 2 seconds...\n');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Send close signal to Electron
+      sendToUI({ type: 'close' });
+      
+      // Wait for graceful close
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force kill electron if still running
+      try {
+        electronProcess.kill();
+      } catch (e) {
+        // Already closed
       }
     }
+    
+    // Close WebSocket server if it exists
+    if (wss) {
+      wss.close();
+    }
+    
+    console.log('Exiting...\n');
+    process.exit(0);
   }
 }
 

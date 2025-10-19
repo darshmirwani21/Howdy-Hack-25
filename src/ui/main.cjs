@@ -27,8 +27,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false
     },
-    title: 'Stagehand UI Testing Dashboard',
-    backgroundColor: '#1a1a1a',
+    title: 'Lumen Test Dashboard',
+    backgroundColor: '#0a0a0a',
     show: false // Don't show until ready
   });
 
@@ -65,23 +65,29 @@ function connectToRunner() {
   ws = new WebSocket(`ws://localhost:${wsPort}`);
   
   ws.onopen = () => {
-    console.log('✅ Connected to runner WebSocket!');
-    mainWindow.webContents.send('ws-status', { connected: true });
+    console.log('Connected to runner WebSocket!');
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('ws-status', { connected: true });
+    }
   };
   
   ws.onmessage = (event) => {
     // Forward all messages from runner to renderer via IPC
-    const data = JSON.parse(event.data);
-    mainWindow.webContents.send('runner-message', data);
+    if (mainWindow && mainWindow.webContents) {
+      const data = JSON.parse(event.data);
+      mainWindow.webContents.send('runner-message', data);
+    }
   };
   
   ws.onerror = (error) => {
-    console.error('❌ WebSocket error:', error.message);
+    console.error('WebSocket error:', error.message);
   };
   
   ws.onclose = () => {
     console.log('WebSocket closed');
-    mainWindow.webContents.send('ws-status', { connected: false });
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('ws-status', { connected: false });
+    }
   };
 }
 
