@@ -7,8 +7,6 @@ import litellm
 load_dotenv()
 
 # Set the API key as environment variable for litellm
-os.environ["OPENAI_API_KEY"] = "dummy-openai-key"
-os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
 
 # Drop unsupported params
 litellm.drop_params = True
