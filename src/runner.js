@@ -490,9 +490,6 @@ async function runTest() {
         if (frameCount === 1) {
           console.log('📺 First CDP frame received, streaming to UI...');
         }
-        if (frameCount % 10 === 0) {
-          console.log(`📺 Streamed ${frameCount} frames to UI`);
-        }
         // Send frame to UI
         sendToUI({ type: 'viewport', image: data, url: stagehand.page.url() });
         // Acknowledge frame to keep stream going
