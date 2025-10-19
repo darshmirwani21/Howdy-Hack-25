@@ -18,9 +18,11 @@ import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const __parentname = path.dirname(path.basename(__dirname));
+console.log(__parentname);
 
 // Load environment variables
-dotenv.config();
+dotenv.config({path: __parentname});
 
 // Console output capture
 let terminalOutput = [];
@@ -87,7 +89,7 @@ function startWebSocketServer(port) {
 
 // Spawn Electron UI
 function spawnElectronUI(port) {
-  const electronPath = path.join(__dirname, 'node_modules', '.bin', 'electron');
+  const electronPath = path.join(__parentname, 'node_modules', '.bin', 'electron');
   const mainPath = path.join(__dirname, 'ui', 'main.cjs');
   
   const electron = spawn(electronPath, [mainPath], {
