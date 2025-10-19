@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Howdy Test Agent - Frontend Interface
-Core Python file that AI agents call to perform automated testing
+Howdy Test Agent - Frontend Interface with Integrated UI Analysis
+Core Python file that AI agents call to perform automated testing with design quality analysis
 """
 
 import asyncio
@@ -10,6 +10,7 @@ import sys
 import argparse
 import requests
 import os
+import base64
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
@@ -41,16 +42,15 @@ class PageData(BaseModel):
 
 class HowdyTestAgent:
     """
-    Main test agent class that interfaces with Stagehand and AI agents
+    Main test agent class with integrated UI design analysis
     
-    This frontend class handles:
+    This class handles:
     1. Stagehand initialization and configuration (LOCAL mode)
     2. Getting prompts from LLM
     3. Connecting to the web port
     4. Making stagehand.agent() calls
     5. Using stagehand.observe() method
-    
-    Backend handles all actual test execution and logic
+    6. Analyzing UI design quality with AI vision
     """
     
     def __init__(self, web_port: int = 3000, backend_port: int = 443):
@@ -61,10 +61,15 @@ class HowdyTestAgent:
         self.stagehand = None
         self.page = None
         
-        # Storage for execution results (Approach 5)
-        self.execution_results = []  # Store all agent execution results
-        self.screenshots = []         # Store screenshot paths
-        self.observations = []        # Store observation results
+        # API configuration for UI analysis
+        self.openrouter_api_key = "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"
+        self.openrouter_base_url = "https://openrouter.ai/api/v1"
+        self.analysis_model = "openai/gpt-5-nano"
+        
+        # Storage for execution results
+        self.execution_results = []
+        self.screenshots = []
+        self.observations = []
         
         # Create screenshots directory if it doesn't exist
         Path("./screenshots").mkdir(parents=True, exist_ok=True)
@@ -87,11 +92,11 @@ class HowdyTestAgent:
                     "base_url": f"http://localhost:{self.backend_port}/v1",
                 },
                 headless=False,
-                verbose=2,  # Detailed logging for debugging
+                verbose=2,
                 use_rich_logging=True,
                 dom_settle_timeout_ms=3000,
-                enable_caching=False,  # Disable caching for testing
-                self_heal=True,  # Enable self-healing
+                enable_caching=False,
+                self_heal=True,
             )
             
             await self.stagehand.init()
@@ -124,11 +129,9 @@ class HowdyTestAgent:
         This is where the AI will provide the testing instructions
         """
         try:
-            # For hackathon: simulate AI prompt input
-            # In production, this would connect to the AI agent API
             print("🤖 Waiting for AI agent prompt...")
             
-            # Simulate getting prompt from stdin or API
+            # Get prompt from stdin or use default
             prompt = input("Enter AI testing prompt: ").strip()
             
             if not prompt:
@@ -144,7 +147,6 @@ class HowdyTestAgent:
     async def agent_method(self, prompt: str) -> Dict[str, Any]:
         """
         Process the AI prompt and generate testing instructions
-        This is the core method that translates AI instructions into actionable tests
         """
         logger.info(f"Processing AI prompt: {prompt}")
         
@@ -165,7 +167,6 @@ class HowdyTestAgent:
     def _parse_prompt_to_tests(self, prompt: str) -> list:
         """
         Convert AI prompt into specific test scenarios
-        This is where we translate natural language into Stagehand commands
         """
         prompt_lower = prompt.lower()
         test_scenarios = []
@@ -215,7 +216,7 @@ class HowdyTestAgent:
     async def stagehand_method(self, test_scenarios: list) -> list:
         """
         Execute tests using Stagehand agent.execute() method
-        Stores results in memory for later backend analysis
+        Stores results in memory for later analysis
         """
         logger.info("Starting Stagehand agent execution...")
         
@@ -263,7 +264,8 @@ class HowdyTestAgent:
                     })
                     
                     # Take manual screenshot and store path
-                    screenshot_path = f"./screenshots/scenario_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    import uuid
+                    screenshot_path = f"./screenshots/scenario_{i}_{uuid.uuid4().hex[:8]}.png"
                     try:
                         await self.page.screenshot(path=screenshot_path)
                         self.screenshots.append(screenshot_path)
@@ -319,7 +321,6 @@ class HowdyTestAgent:
     async def _simulate_stagehand_test(self, scenario: str) -> TestResult:
         """
         Simulate Stagehand test execution
-        Replace this with actual Stagehand API calls
         """
         # Simulate test execution time
         await asyncio.sleep(0.5)
@@ -380,7 +381,6 @@ class HowdyTestAgent:
     async def observe_method(self, web_port: int = None) -> Dict[str, Any]:
         """
         Observe the web application using Stagehand's observe method
-        Stores observation results in memory for later backend analysis
         """
         port = web_port or self.web_port
         logger.info(f"Observing web application on port {port}")
@@ -429,12 +429,10 @@ class HowdyTestAgent:
     async def create_live_server_connection(self) -> bool:
         """
         Verify connection to the web port
-        Simple check that the web server is accessible
         """
         logger.info(f"Checking connection to web server on port {self.web_port}...")
         
         try:
-            # Simple connection check
             response = requests.get(f"http://localhost:{self.web_port}", timeout=5)
             logger.info(f"✅ Web server connected on port {self.web_port}")
             return True
@@ -445,84 +443,209 @@ class HowdyTestAgent:
             logger.error(f"❌ Error connecting to web server: {e}")
             return False
     
-    async def send_to_backend_for_analysis(self) -> Dict[str, Any]:
+    async def analyze_screenshots_locally(self) -> Dict[str, Any]:
         """
-        Send all collected execution data to backend for analysis
-        This includes agent results, screenshots, and observations
+        Analyze all captured screenshots using AI vision for UI design quality
+        This integrates the UI Design Analyzer functionality
         """
-        logger.info("📤 Sending collected data to backend for analysis...")
+        logger.info(f"🎨 Analyzing {len(self.screenshots)} screenshots for UI quality...")
         
-        try:
-            # Prepare payload with all collected data
-            payload = {
-                "execution_results": self.execution_results,
-                "screenshot_paths": self.screenshots,
-                "observations": self.observations,
-                "metadata": {
-                    "total_executions": len(self.execution_results),
-                    "total_screenshots": len(self.screenshots),
-                    "total_observations": len(self.observations),
-                    "web_port": self.web_port,
-                    "timestamp": datetime.now().isoformat()
-                }
+        if not self.screenshots:
+            logger.warning("No screenshots to analyze")
+            return {
+                "total_screenshots": 0,
+                "analyses": [],
+                "summary": {
+                    "average_score": 0,
+                    "good_designs": 0,
+                    "needs_improvement": 0
+                },
+                "timestamp": datetime.now().isoformat()
             }
-            
-            logger.info(f"Payload contains:")
-            logger.info(f"  - {len(self.execution_results)} execution results")
-            logger.info(f"  - {len(self.screenshots)} screenshots")
-            logger.info(f"  - {len(self.observations)} observations")
-            
-            # Send to backend analysis endpoint
-            response = requests.post(
-                f"http://localhost:{self.backend_port}/analyze",
-                json=payload,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                analysis_result = response.json()
-                logger.info("✅ Backend analysis completed successfully")
-                return {
-                    "status": "success",
-                    "analysis": analysis_result,
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                logger.error(f"Backend returned status code: {response.status_code}")
-                return {
-                    "status": "error",
-                    "error": f"Backend returned {response.status_code}",
-                    "response": response.text,
-                    "timestamp": datetime.now().isoformat()
+        
+        analyses = []
+        
+        for i, screenshot_path in enumerate(self.screenshots):
+            try:
+                logger.info(f"Analyzing screenshot {i+1}/{len(self.screenshots)}: {screenshot_path}")
+                
+                # Read and encode the screenshot
+                with open(screenshot_path, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+                # Prepare the UI analysis prompt
+                prompt = """Analyze this UI design screenshot and evaluate it across these criteria:
+
+1. **Composition & Centering**: Is the main UI element properly centered? Is the layout balanced?
+2. **Design Quality**: Is the design professional, modern, and well-executed?
+3. **Color Scheme**: Are the colors harmonious? Do they work well together? Is there good contrast?
+4. **Aesthetic Appeal**: Overall visual appeal and polish
+5. **Format & Size**: Does it appear to be properly sized and formatted?
+
+Provide your assessment in this JSON format:
+{
+    "overall_score": <1-10>,
+    "is_good_design": <true/false>,
+    "composition": {
+        "score": <1-10>,
+        "feedback": "brief comment"
+    },
+    "design_quality": {
+        "score": <1-10>,
+        "feedback": "brief comment"
+    },
+    "color_scheme": {
+        "score": <1-10>,
+        "feedback": "brief comment"
+    },
+    "aesthetics": {
+        "score": <1-10>,
+        "feedback": "brief comment"
+    },
+    "recommendations": ["suggestion 1", "suggestion 2"]
+}
+
+Be honest and constructive."""
+
+                # Make API call to OpenRouter
+                headers = {
+                    "Authorization": f"Bearer {self.openrouter_api_key}",
+                    "Content-Type": "application/json"
                 }
                 
-        except requests.exceptions.ConnectionError:
-            logger.error("❌ Cannot connect to backend for analysis")
-            return {
-                "status": "error",
-                "error": "Backend connection refused",
-                "timestamp": datetime.now().isoformat()
-            }
-        except Exception as e:
-            logger.error(f"❌ Error sending data to backend: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }
+                payload = {
+                    "model": self.analysis_model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{base64_image}"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                response = requests.post(
+                    f"{self.openrouter_base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=60
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                analysis_text = result['choices'][0]['message']['content']
+                
+                # Try to parse JSON from response
+                try:
+                    start = analysis_text.find('{')
+                    end = analysis_text.rfind('}') + 1
+                    if start != -1 and end > start:
+                        analysis_json = json.loads(analysis_text[start:end])
+                    else:
+                        analysis_json = {"raw_response": analysis_text}
+                except json.JSONDecodeError:
+                    analysis_json = {"raw_response": analysis_text}
+                
+                analyses.append({
+                    "screenshot": screenshot_path,
+                    "analysis": analysis_json,
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                logger.info(f"✅ Screenshot {i+1} analyzed successfully")
+                
+            except Exception as e:
+                logger.error(f"❌ Error analyzing screenshot {screenshot_path}: {e}")
+                analyses.append({
+                    "screenshot": screenshot_path,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        # Calculate summary statistics
+        valid_analyses = [a for a in analyses if "analysis" in a and "overall_score" in a.get("analysis", {})]
+        total_score = sum(a["analysis"]["overall_score"] for a in valid_analyses)
+        average_score = total_score / len(valid_analyses) if valid_analyses else 0
+        good_designs = sum(1 for a in valid_analyses if a["analysis"].get("is_good_design", False))
+        
+        return {
+            "total_screenshots": len(self.screenshots),
+            "analyses": analyses,
+            "summary": {
+                "average_score": round(average_score, 1),
+                "good_designs": good_designs,
+                "needs_improvement": len(valid_analyses) - good_designs
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    def print_ui_analysis_report(self, ui_analysis: Dict[str, Any]):
+        """
+        Pretty print the UI analysis results
+        """
+        print("\n" + "="*70)
+        print("🎨 UI DESIGN ANALYSIS REPORT")
+        print("="*70)
+        
+        summary = ui_analysis.get("summary", {})
+        print(f"\n📊 Overall Summary:")
+        print(f"   Average Score: {summary.get('average_score', 0):.1f}/10")
+        print(f"   ✅ Good Designs: {summary.get('good_designs', 0)}")
+        print(f"   ⚠️  Needs Improvement: {summary.get('needs_improvement', 0)}")
+        
+        print(f"\n🖼️  Individual Screenshot Analysis:")
+        for i, analysis in enumerate(ui_analysis.get("analyses", []), 1):
+            print(f"\n   Screenshot {i}: {Path(analysis.get('screenshot', 'Unknown')).name}")
+            
+            if "error" in analysis:
+                print(f"   ❌ Error: {analysis['error']}")
+                continue
+            
+            analysis_data = analysis.get("analysis", {})
+            if "overall_score" in analysis_data:
+                score = analysis_data["overall_score"]
+                is_good = analysis_data.get("is_good_design", False)
+                status = "✅ GOOD" if is_good else "⚠️ NEEDS WORK"
+                print(f"   Score: {score}/10 - {status}")
+                
+                # Show category scores
+                for category in ["composition", "design_quality", "color_scheme", "aesthetics"]:
+                    if category in analysis_data:
+                        cat = analysis_data[category]
+                        print(f"      • {category.replace('_', ' ').title()}: {cat.get('score', 0)}/10")
+                        print(f"        {cat.get('feedback', 'No feedback')}")
+                
+                # Show recommendations
+                if "recommendations" in analysis_data and analysis_data["recommendations"]:
+                    print(f"   💡 Recommendations:")
+                    for rec in analysis_data["recommendations"]:
+                        print(f"      • {rec}")
+            else:
+                print(f"   📝 Raw analysis: {analysis_data.get('raw_response', 'No data')[:200]}...")
+        
+        print("\n" + "="*70 + "\n")
     
     async def run_full_test_cycle(self) -> Dict[str, Any]:
         """
-        Run the complete test cycle:
+        Run the complete test cycle with UI design analysis:
         1. Get AI prompt
         2. Process prompt into test scenarios
         3. Check backend API connection
         4. Verify web server connection
         5. Execute stagehand.agent() calls (stores results in memory)
         6. Run stagehand.observe() (stores observations in memory)
-        7. Send all collected data to backend for analysis
-        
-        Returns final results including backend analysis
+        7. Analyze all screenshots for UI design quality
+        8. Return comprehensive results
         """
         logger.info("🚀 Starting full test cycle...")
         
@@ -545,9 +668,9 @@ class HowdyTestAgent:
             # Step 6: Final observation
             final_observation = await self.observe_method()
             
-            # Step 7: Send all collected data to backend for analysis
-            logger.info("📊 Sending data to backend for analysis...")
-            backend_analysis = await self.send_to_backend_for_analysis()
+            # Step 7: Analyze screenshots for UI quality (NEW!)
+            logger.info("🎨 Starting UI design analysis...")
+            ui_analysis = await self.analyze_screenshots_locally()
             
             # Compile final results
             final_results = {
@@ -566,7 +689,7 @@ class HowdyTestAgent:
                     } for result in test_results
                 ],
                 "final_observation": final_observation,
-                "backend_analysis": backend_analysis,  # Include backend analysis results
+                "ui_analysis": ui_analysis,
                 "collected_data": {
                     "execution_results_count": len(self.execution_results),
                     "screenshots_count": len(self.screenshots),
@@ -578,13 +701,17 @@ class HowdyTestAgent:
                     "failed_tests": sum(1 for r in test_results if not r.success),
                     "backend_api_connected": backend_api_status.get("status") == "connected",
                     "web_server_connected": server_connected,
-                    "backend_analysis_status": backend_analysis.get("status"),
+                    "ui_quality": {
+                        "average_score": ui_analysis.get("summary", {}).get("average_score", 0),
+                        "good_designs": ui_analysis.get("summary", {}).get("good_designs", 0),
+                        "needs_improvement": ui_analysis.get("summary", {}).get("needs_improvement", 0)
+                    },
                     "timestamp": datetime.now().isoformat()
                 }
             }
             
             logger.info("✅ Test cycle completed successfully")
-            logger.info(f"📊 Backend analysis status: {backend_analysis.get('status')}")
+            logger.info(f"🎨 UI Analysis: {ui_analysis.get('summary', {}).get('good_designs', 0)}/{len(self.screenshots)} good designs")
             return final_results
             
         except Exception as e:
@@ -599,10 +726,10 @@ async def main():
     """
     Main entry point for the test agent
     """
-    parser = argparse.ArgumentParser(description='Howdy Test Agent - AI Testing Interface')
+    parser = argparse.ArgumentParser(description='Howdy Test Agent - AI Testing Interface with UI Analysis')
     parser.add_argument('--web-port', type=int, default=3000, help='Web application port')
     parser.add_argument('--backend-port', type=int, default=443, help='Backend API port')
-    parser.add_argument('--output', choices=['json', 'text'], default='json', help='Output format')
+    parser.add_argument('--output', choices=['json', 'text'], default='text', help='Output format')
     parser.add_argument('--prompt', type=str, help='Direct prompt input (for testing)')
     parser.add_argument('--env', choices=['LOCAL'], default='LOCAL', help='Stagehand environment (LOCAL only)')
     
@@ -613,6 +740,7 @@ async def main():
     
     # Override prompt if provided via command line
     if args.prompt:
+        original_get_prompt = agent.get_ai_prompt
         agent.get_ai_prompt = lambda: args.prompt
     
     try:
@@ -630,11 +758,25 @@ async def main():
         if args.output == 'json':
             print(json.dumps(results, indent=2))
         else:
-            print(f"Test Results Summary:")
+            # Text output with pretty UI analysis
+            print(f"\n{'='*70}")
+            print("TEST RESULTS SUMMARY")
+            print(f"{'='*70}")
             print(f"Total Tests: {results.get('summary', {}).get('total_tests', 0)}")
-            print(f"Passed: {results.get('summary', {}).get('passed_tests', 0)}")
-            print(f"Failed: {results.get('summary', {}).get('failed_tests', 0)}")
+            print(f"✅ Passed: {results.get('summary', {}).get('passed_tests', 0)}")
+            print(f"❌ Failed: {results.get('summary', {}).get('failed_tests', 0)}")
             print(f"Status: {'✅ Success' if 'error' not in results else '❌ Failed'}")
+            
+            # Show UI quality summary
+            ui_quality = results.get('summary', {}).get('ui_quality', {})
+            print(f"\n🎨 UI Design Quality:")
+            print(f"   Average Score: {ui_quality.get('average_score', 0):.1f}/10")
+            print(f"   ✅ Good Designs: {ui_quality.get('good_designs', 0)}")
+            print(f"   ⚠️  Needs Improvement: {ui_quality.get('needs_improvement', 0)}")
+            
+            # Print detailed UI analysis if available
+            if 'ui_analysis' in results:
+                agent.print_ui_analysis_report(results['ui_analysis'])
     
     finally:
         # Always close Stagehand session
