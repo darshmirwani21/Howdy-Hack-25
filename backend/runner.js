@@ -674,16 +674,32 @@ async function runTest() {
     // Send completion signal
     sendToUI({ type: 'complete', message: 'Test completed' });
 
-    // Keep process alive if UI is running
+    // Auto-close UI and exit after 2 seconds
     if (useUI && electronProcess) {
-      console.log('\nTest complete. UI will remain open. Close the Electron window to exit.\n');
-      // Don't exit, let Electron control the lifecycle
-    } else {
-      // Close WebSocket server if it exists
-      if (wss) {
-        wss.close();
+      console.log('\nTest complete. Closing UI in 2 seconds...\n');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Send close signal to Electron
+      sendToUI({ type: 'close' });
+      
+      // Wait for graceful close
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force kill electron if still running
+      try {
+        electronProcess.kill();
+      } catch (e) {
+        // Already closed
       }
     }
+    
+    // Close WebSocket server if it exists
+    if (wss) {
+      wss.close();
+    }
+    
+    console.log('Exiting...\n');
+    process.exit(0);
   }
 }
 

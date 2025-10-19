@@ -133,6 +133,9 @@ function handleMessage(data) {
     case 'complete':
       handleComplete(data);
       break;
+    case 'close':
+      handleClose();
+      break;
     default:
       console.log('Unknown message type:', data.type);
   }
@@ -259,6 +262,12 @@ function handleSummary(data) {
 function handleComplete(data) {
   updateStatus('complete', 'Test Complete');
   console.log('Test completed:', data);
+}
+
+// Handle close signal
+function handleClose() {
+  console.log('Received close signal, closing window...');
+  window.close();
 }
 
 // Initialize IPC listeners when page loads
