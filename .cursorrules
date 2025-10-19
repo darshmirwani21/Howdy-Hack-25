@@ -1,80 +1,53 @@
-# Project Testing Rules for Cursor AI
+Stagehand CLI Flags Documentation
+Purpose: AI-powered browser testing tool with screenshot capture, visual analysis, and optional Electron UI dashboard
+location: /Users/arjunbabla/GitHub/Howdy-Hack-25/backend/
+Usage: node runner.js --url <URL> --test "<description>" [--agent] [--screenshots] [--ui]
+Use this whenever developing a web app; use intermittently through CLI with every substantial edit, and specify what changed, and on what page. The report will come back through CLI.
 
-## Web Application Port Configuration
-- **Always use port 3000** for building websites
-- After creating any web application, display: `🌐 Server running on http://localhost:3000`
+Required Flags:
+--url (or -u)
+   Function: Specifies the target website URL to navigate to and test
+   Type: String (required)
+   Example: --url https://example.com OR a localhost link.
+   Converse: N/A (required parameter)
+--test (or -t)
+   F unction: Natural language description of the action or test to perform on the page
+   Type: String (required)
+   Example: --test "Click the login button and verify the form appears"
+   Converse: N/A (required parameter)
+   
+Optional Flags:
+--agent (or -a)
+   Function: Enables Computer Use Agent (CU) mode - autonomous multi-step execution where the AI agent can perform multiple sequential actions to accomplish complex tasks
+   Default: false (normal mode)
+   When enabled: Uses stagehand.agent().execute() to autonomously break down and execute multi-step workflows (e.g., "sign up, fill profile, and navigate to dashboard")
+   Converse (when disabled): Uses Normal mode - single action execution via page.act() that performs one discrete action only (e.g., "click the button")
+   Use case: Enable for complex workflows requiring multiple steps; disable for simple single actions
+--screenshots (or -s)
+   Function: Enables comprehensive screenshot capture and AI-powered visual analysis pipeline
+   Default: false (no screenshots)
+   When enabled:
+      Creates timestamped run folder in backend/screenshots/run_YYYY-MM-DD_HH-MM-SS/
+      Captures "before" screenshot (pre-action state)
+      Captures "after" screenshot (post-action state)
+      Runs OpenRouter GPT-4o vision model analysis comparing before/after states
+      Generates detailed critique checking: visual design issues, layout problems, accessibility concerns, UX issues, bugs/glitches
+      Creates GPT-4o-mini summary combining vision analysis and terminal output
+      Saves all screenshots as PNG files and terminal output as terminal_output.txt
+   Converse (when disabled): No screenshots captured, no AI analysis performed, no files saved - execution only with console logging
+   Use case: Enable for visual regression testing, UI debugging, and documentation; disable for quick functional tests
+--ui
+   Function: Launches Electron desktop dashboard with real-time browser viewport streaming and live AI critique
+   Default: false (no UI)
+   When enabled:
+      Forces browser into headless mode (no browser window visible)
+      Starts WebSocket server on port 9876 for communication
+      Spawns Electron app displaying live browser viewport via Chrome DevTools Protocol (CDP) screencast
+      Streams real-time frames at 1280x720 resolution to dashboard
+      Provides live AI critique of each screenshot as they're captured
+      Displays test progress, status updates, and final summary in UI
+      Keeps process alive after test completion (close Electron window to exit)
+   Converse (when disabled): Browser runs in headed mode (visible window), no dashboard, standard terminal output only, process exits after completion
+   Use case: Enable for visual monitoring, demos, and debugging with live feedback; disable for CI/CD pipelines or background automation
 
-## External Program Integration
-After creating a website, run:
-```
-xyz --port 3000
-```
-This should be executed automatically after the web server is started.
-
-## Automatic Testing
-After making ANY code changes, run the appropriate test suite:
-
-### Python Files
-```
-python test_agent.py
-```
-
-### JavaScript/TypeScript Files
-```
-npm test
-```
-
-### Java Files
-```
-mvn test
-```
-
-### Go Files
-```
-go test ./...
-```
-
-### Rust Files
-```
-cargo test
-```
-
-### C/C++ Files
-```
-make test
-```
-
-### General Rule
-If unsure which test command to use, ask the user or check for:
-- package.json (Node.js) → `npm test`
-- requirements.txt or setup.py (Python) → `pytest` or `python -m pytest`
-- Cargo.toml (Rust) → `cargo test`
-- go.mod (Go) → `go test ./...`
-- pom.xml (Java/Maven) → `mvn test`
-- build.gradle (Java/Gradle) → `gradle test`
-
-## Test Verification Workflow
-1. Make the requested code changes
-2. Identify the file type and run appropriate tests
-3. If tests fail:
-   - Analyze the error output
-   - Fix the issues
-   - Re-run the tests
-   - Repeat until all tests pass
-4. Only mark the task as complete once all tests pass
-
-## Test Output Handling
-- If all tests pass: Confirm success to the user
-- If tests fail: Show the error output and explain what needs to be fixed
-
-## When to Skip Tests
-Only skip running tests if the user explicitly says:
-- "Don't run tests"
-- "Skip testing"
-- "No need to test"
-
-## Code Quality
-- Write code that passes existing tests
-- When adding new features, suggest writing new tests if none exist
-- Maintain test coverage for critical functionality
-- Follow language-specific testing best practices
+Note: I want screenshots basically always enabled, and UI always enabled. Only change these if the user specifies.
