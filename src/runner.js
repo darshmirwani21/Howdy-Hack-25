@@ -3,8 +3,9 @@
  * Stagehand Browser Automation Runner with Visual UI Testing
  * 
  * CLI tool for AI-powered browser testing with screenshot capture, AI analysis, and optional Electron UI
+ * Uses Observe + Act pattern: observe to identify actions, then act to execute them
  * 
- * Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--ui]
+ * Usage: node runner.js --url <URL> --test "<test description>" [--screenshots] [--ui]
  */
 
 import { Stagehand } from '@browserbasehq/stagehand';
@@ -19,8 +20,9 @@ import { spawn } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from main folder (parent directory)
+const mainFolderPath = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(mainFolderPath, '.env') });
 
 // Console output capture
 let terminalOutput = [];
@@ -87,7 +89,8 @@ function startWebSocketServer(port) {
 
 // Spawn Electron UI
 function spawnElectronUI(port) {
-  const electronPath = path.join(__dirname, 'node_modules', '.bin', 'electron');
+  // Look for electron in root node_modules (parent directory)
+  const electronPath = path.join(mainFolderPath, 'node_modules', '.bin', 'electron');
   const mainPath = path.join(__dirname, 'ui', 'main.cjs');
   
   const electron = spawn(electronPath, [mainPath], {
@@ -114,11 +117,6 @@ function parseArguments() {
         type: 'string',
         short: 't'
       },
-      agent: {
-        type: 'boolean',
-        short: 'a',
-        default: false
-      },
       screenshots: {
         type: 'boolean',
         short: 's',
@@ -126,6 +124,11 @@ function parseArguments() {
       },
       ui: {
         type: 'boolean',
+        default: false
+      },
+      agent: {
+        type: 'boolean',
+        short: 'a',
         default: false
       }
     }
@@ -136,7 +139,7 @@ function parseArguments() {
     console.log('Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--ui]\n');
     console.log('Examples:');
     console.log('  node runner.js --url https://example.com --test "Click the login button"');
-    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --agent --screenshots');
+    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --screenshots');
     console.log('  node runner.js --url https://example.com --test "Check UI" --screenshots --ui\n');
     process.exit(1);
   }
@@ -144,9 +147,9 @@ function parseArguments() {
   return {
     url: values.url,
     test: values.test,
-    useAgent: values.agent,
     captureScreenshots: values.screenshots,
-    useUI: values.ui
+    useUI: values.ui,
+    useAgent: values.agent
   };
 }
 
@@ -195,7 +198,7 @@ async function critiqueScreenshot(screenshotPath, openrouterApiKey) {
         'X-Title': 'Stagehand UI Analysis'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'user',
@@ -289,7 +292,7 @@ Brief summary of the UI journey and quality
         'X-Title': 'Stagehand UI Analysis'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'user',
@@ -313,10 +316,10 @@ Brief summary of the UI journey and quality
   }
 }
 
-// Summary Analysis with GPT-4o-mini
+// Summary Analysis with GPT-5-mini
 async function generateSummary(visionCritique, terminalOutput, openrouterApiKey) {
   try {
-    console.log('Generating summary with GPT-4o-mini...\n');
+    console.log('Generating summary...\n');
     
     const prompt = `Analyze these browser testing results. Be concise and actionable.
 
@@ -356,7 +359,7 @@ ${terminalOutput.slice(-50).join('\n')}`;
         'X-Title': 'Stagehand Test Summary'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'user',
@@ -381,11 +384,11 @@ ${terminalOutput.slice(-50).join('\n')}`;
 }
 
 async function runTest() {
-  const { url, test, useAgent, captureScreenshots, useUI } = parseArguments();
+  const { url, test, captureScreenshots, useUI, useAgent } = parseArguments();
 
   // Validate environment variables
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-  const modelName = process.env.STAGEHAND_MODEL || 'openai/gpt-4o-mini';
+  const modelName = process.env.STAGEHAND_MODEL || 'openai/gpt-5-mini';
 
   if (!openrouterApiKey) {
     console.error('Error: OPENROUTER_API_KEY environment variable is required');
@@ -576,9 +579,10 @@ async function runTest() {
       });
     }
 
-    // Run the test
+    // Run the test using observe + act pattern
     sendToUI({ type: 'status', message: 'Running test...' });
     
+
     if (useAgent) {
       // Computer Use (CU) Agent Mode - Multi-step autonomous
       console.log('Starting Computer Use Agent (multi-step autonomous)...');
@@ -594,15 +598,82 @@ async function runTest() {
       console.log('Computer Use Agent completed!\n');
       console.log('Result:', result);
     } else {
-      // Normal Mode - Single action
-      console.log('Starting single action (normal mode)...');
-      console.log('-'.repeat(80));
+      // Normal Mode - Observe + Act pattern
+      console.log('🤖 Starting Observe + Act pattern...');
+    console.log('-'.repeat(80));
+    
+    const page = stagehand.page;
+    
+    // Step 1: Observe - Find elements/actions based on the instruction
+    console.log('👁️  Step 1: Observing page to identify actions...');
+    const observations = await page.observe(test);
+    
+    console.log(`✅ Found ${observations.length} possible action(s):\n`);
+    observations.forEach((obs, index) => {
+      console.log(`   ${index + 1}. ${obs.description || 'Action'}`);
+      console.log(`      Method: ${obs.method}`);
+      console.log(`      Selector: ${obs.selector}\n`);
+    });
+    
+    // Step 2: Act - Execute each observed action
+    if (observations.length > 0) {
+      console.log('🎬 Step 2: Executing observed actions...\n');
       
-      const page = stagehand.page;
-      await page.act(test);
+      for (let i = 0; i < observations.length; i++) {
+        const observation = observations[i];
+        console.log(`   Executing action ${i + 1}/${observations.length}: ${observation.description || 'Action'}`);
+        
+        try {
+          // Perform the action using the observation result
+          await page.act({
+            action: observation.method,
+            selector: observation.selector,
+            args: observation.arguments
+          });
+          
+          console.log(`   ✅ Action ${i + 1} completed successfully\n`);
+          
+          // Wait a bit between actions
+          if (i < observations.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        } catch (error) {
+          console.error(`   ❌ Action ${i + 1} failed:`, error.message);
+        }
+      }
+    } else {
+      console.log('⚠️  No actions found to execute\n');
+    }
 
-      console.log('-'.repeat(80));
-      console.log('Action completed!\n');
+    console.log('-'.repeat(80));
+    console.log('✅ Observe + Act pattern completed!\n');
+
+    // Capture "after" screenshot
+    if (captureScreenshots) {
+      stepCounter++;
+      console.log('📸 Capturing AFTER screenshot...');
+      sendToUI({ type: 'status', message: 'Capturing AFTER screenshot...' });
+      
+      const { filepath, filename, base64Image } = await saveScreenshot(stagehand.page, runFolder, 'after', stepCounter);
+      screenshotPaths.push(filepath);
+      
+      // Send to UI
+      sendToUI({ 
+        type: 'screenshot', 
+        image: base64Image, 
+        step: stepCounter, 
+        prefix: 'after',
+        filename 
+      });
+      
+      // Run critique immediately (real-time)
+      if (useUI) {
+        console.log('🔍 Running AI critique...');
+        const critique = await critiqueScreenshot(filepath, openrouterApiKey);
+        sendToUI({ type: 'critique', step: stepCounter, critique });
+        console.log(`✅ Critique complete\n`);
+      }
+    }
     }
 
     // Give time to see the result

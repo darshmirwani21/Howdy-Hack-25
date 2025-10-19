@@ -1,31 +1,7 @@
-# Environment variables
 **/.env
-.env
-
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.egg
-*.egg-info
-.Python
-venv/
-env/
-*.pyc
-
-# Node.js
+.venv
 node_modules/
+**/screenshots/
 package-lock.json
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+**/__pycache__
+**/.DS_Store

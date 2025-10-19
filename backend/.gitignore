@@ -1,7 +1,0 @@
-.env
-.venv
-node_modules/
-screenshots/
-package-lock.json
-__pycache__
-**/.DS_Store
