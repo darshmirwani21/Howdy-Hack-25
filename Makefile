@@ -1,6 +1,9 @@
 LLM_BACKEND_IMAGE_NAME = llm_backend
 LLM_BACKEND_PORT = 8000
 
+env:
+	cat backend/llm_backend/.env.example >> backend/llm_backend/.env
+
 build:
 	docker build -t $(LLM_BACKEND_IMAGE_NAME) backend/llm_backend
 
