@@ -7,26 +7,26 @@ In essence, we prevent bugs in AI generated code.
 
 ## Why we're revolutionizing unit testing
 
-### 🧠 **Multi-Model AI Architecture**
+###  **Multi-Model AI Architecture**
 - **OpenRouter Integration**: Access 100+ AI models including GPT-4o, Claude, Gemini, and more. We engineered a custom solution that allows OpenRouter, with FREE models, to interact with stagehand.
 - **Intelligent Model Selection**: Automatically choose the best model for your specific testing needs.
 - **Vision Model Analysis**: Pixel-perfect UI critique and visual regression detection
 
-### 🎯 **Universal IDE Integration**
+###  **Universal IDE Integration**
 - **VS Code**: Seamless integration with your favorite editor
 - **Cursor**: Automatically detects and integrates with Cursor's AI workflow
 - **JetBrains**: Works with IntelliJ, WebStorm, PyCharm
 - **Terminal**: Command-line interface for CI/CD pipelines
 - **Any Editor**: Works with any development environment
 
-### 🔍 **Advanced Testing Capabilities**
+###  **Advanced Testing Capabilities**
 - **Observe + Act Pattern**: Revolutionary two-phase testing approach
 - **Real-time Visual Analysis**: Live AI critique of UI changes
 - **Screenshot Automation**: Intelligent capture on every page navigation
 - **Multi-step Workflows**: Complex user journey testing
 - **Visual Regression Detection**: Catch UI bugs before they reach production
 
-## ⚡ Quick Start (30 seconds)
+##  Quick Start
 
 ### 1. **Install Dependencies**
 ```bash
@@ -43,7 +43,7 @@ echo "OPENROUTER_API_KEY=your_key_here" > .env
 node src/runner.js --url https://your-site.com --test "click login button" --screenshots --ui
 ```
 
-**That's it!** 🎉 Lumen will automatically:
+**That's it!**  Lumen will automatically:
 - Navigate to your site
 - Execute the test using AI
 - Capture screenshots
