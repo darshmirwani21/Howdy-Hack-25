@@ -444,7 +444,7 @@ async function runTest() {
   // Initialize Stagehand with LOCAL environment
   const stagehand = new Stagehand({
     env: 'LOCAL',
-    headless: useUI, // Force headless when UI is enabled
+    headless: true, // Always run in headless mode
     verbose: 1,
     debugDom: true,
     enableCaching: false,

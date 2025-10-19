@@ -27,7 +27,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false
     },
-    title: 'Lumen Test Dashboard',
+    title: 'Lumen',
     backgroundColor: '#0a0a0a',
     show: false // Don't show until ready
   });

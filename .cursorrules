@@ -1,6 +1,6 @@
 Stagehand CLI Flags Documentation
 Purpose: AI-powered browser testing tool with screenshot capture, visual analysis, and optional Electron UI dashboard
-location: /Users/arjunbabla/GitHub/Howdy-Hack-25/backend/
+location: /Users/arjunbabla/GitHub/Howdy-Hack-25/src/
 Usage: node runner.js --url <URL> --test "<description>" [--agent] [--screenshots] [--ui]
 Use this whenever developing a web app; use intermittently through CLI with every substantial edit, and specify what changed, and on what page. The report will come back through CLI.
 
