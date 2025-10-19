@@ -3,8 +3,9 @@
  * Stagehand Browser Automation Runner with Visual UI Testing
  * 
  * CLI tool for AI-powered browser testing with screenshot capture, AI analysis, and optional Electron UI
+ * Uses Observe + Act pattern: observe to identify actions, then act to execute them
  * 
- * Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--ui]
+ * Usage: node runner.js --url <URL> --test "<test description>" [--screenshots] [--ui]
  */
 
 import { Stagehand } from '@browserbasehq/stagehand';
@@ -18,11 +19,10 @@ import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const __parentname = path.dirname(path.basename(__dirname));
-console.log(__parentname);
 
-// Load environment variables
-dotenv.config({path: __parentname});
+// Load environment variables from main folder (parent directory)
+const mainFolderPath = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(mainFolderPath, '.env') });
 
 // Console output capture
 let terminalOutput = [];
@@ -89,12 +89,14 @@ function startWebSocketServer(port) {
 
 // Spawn Electron UI
 function spawnElectronUI(port) {
-  const electronPath = path.join(__parentname, 'node_modules', '.bin', 'electron');
+  // Look for electron in root node_modules (parent directory)
+  const electronPath = path.join(mainFolderPath, 'node_modules', '.bin', 'electron.cmd');
   const mainPath = path.join(__dirname, 'ui', 'main.cjs');
   
   const electron = spawn(electronPath, [mainPath], {
     env: { ...process.env, WS_PORT: port },
-    stdio: 'inherit'
+    stdio: 'inherit',
+    shell: true
   });
   
   electron.on('error', (err) => {
@@ -116,11 +118,6 @@ function parseArguments() {
         type: 'string',
         short: 't'
       },
-      agent: {
-        type: 'boolean',
-        short: 'a',
-        default: false
-      },
       screenshots: {
         type: 'boolean',
         short: 's',
@@ -135,10 +132,10 @@ function parseArguments() {
 
   if (!values.url || !values.test) {
     console.error('❌ Error: Both --url and --test arguments are required\n');
-    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--ui]\n');
+    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--screenshots] [--ui]\n');
     console.log('Examples:');
     console.log('  node runner.js --url https://example.com --test "Click the login button"');
-    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --agent --screenshots');
+    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --screenshots');
     console.log('  node runner.js --url https://example.com --test "Check UI" --screenshots --ui\n');
     process.exit(1);
   }
@@ -146,7 +143,6 @@ function parseArguments() {
   return {
     url: values.url,
     test: values.test,
-    useAgent: values.agent,
     captureScreenshots: values.screenshots,
     useUI: values.ui
   };
@@ -354,7 +350,7 @@ ${terminalOutput.join('\n')}`;
 }
 
 async function runTest() {
-  const { url, test, useAgent, captureScreenshots, useUI } = parseArguments();
+  const { url, test, captureScreenshots, useUI } = parseArguments();
 
   // Validate environment variables
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
@@ -399,14 +395,14 @@ async function runTest() {
   }
 
   console.log('🚀 Starting Stagehand Browser Automation');
-  console.log('=' .repeat(80));
+  console.log('='.repeat(80));
   console.log(`🌐 Target URL: ${url}`);
   console.log(`🧪 Test: ${test}`);
   console.log(`🤖 Model: ${modelName}`);
-  console.log(`🎯 Mode: ${useAgent ? 'Computer Use Agent (CU)' : 'Normal (single action)'}`);
+  console.log(`🎯 Mode: Observe + Act (multi-step)`);
   console.log(`📸 Screenshots: ${captureScreenshots ? 'Enabled' : 'Disabled'}`);
   console.log(`🖥️  UI Dashboard: ${useUI ? 'Enabled' : 'Disabled'}`);
-  console.log('=' .repeat(80));
+  console.log('='.repeat(80));
 
   // Send initial status to UI
   sendToUI({ type: 'status', message: 'Initializing...', url: null });
@@ -505,34 +501,57 @@ async function runTest() {
       }
     }
 
-    // Run the test
+    // Run the test using observe + act pattern
     sendToUI({ type: 'status', message: 'Running test...' });
     
-    if (useAgent) {
-      // Computer Use (CU) Agent Mode - Multi-step autonomous
-      console.log('🤖 Starting Computer Use Agent (multi-step autonomous)...');
-      console.log('-'.repeat(80));
+    console.log('🤖 Starting Observe + Act pattern...');
+    console.log('-'.repeat(80));
+    
+    const page = stagehand.page;
+    
+    // Step 1: Observe - Find elements/actions based on the instruction
+    console.log('👁️  Step 1: Observing page to identify actions...');
+    const observations = await page.observe(test);
+    
+    console.log(`✅ Found ${observations.length} possible action(s):\n`);
+    observations.forEach((obs, index) => {
+      console.log(`   ${index + 1}. ${obs.description || 'Action'}`);
+      console.log(`      Method: ${obs.method}`);
+      console.log(`      Selector: ${obs.selector}\n`);
+    });
+    
+    // Step 2: Act - Execute each observed action
+    if (observations.length > 0) {
+      console.log('🎬 Step 2: Executing observed actions...\n');
       
-      const agent = stagehand.agent({
-        model: modelName
-      });
-      
-      const result = await agent.execute(test);
-      
-      console.log('-'.repeat(80));
-      console.log('✅ Computer Use Agent completed!\n');
-      console.log('📊 Result:', result);
+      for (let i = 0; i < observations.length; i++) {
+        const observation = observations[i];
+        console.log(`   Executing action ${i + 1}/${observations.length}: ${observation.description || 'Action'}`);
+        
+        try {
+          // Perform the action using the observation result
+          await page.act({
+            action: observation.method,
+            selector: observation.selector,
+            args: observation.arguments
+          });
+          
+          console.log(`   ✅ Action ${i + 1} completed successfully\n`);
+          
+          // Wait a bit between actions
+          if (i < observations.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`   ❌ Action ${i + 1} failed:`, error.message);
+        }
+      }
     } else {
-      // Normal Mode - Single action
-      console.log('🤖 Starting single action (normal mode)...');
-      console.log('-'.repeat(80));
-      
-      const page = stagehand.page;
-      await page.act(test);
-
-      console.log('-'.repeat(80));
-      console.log('✅ Action completed!\n');
+      console.log('⚠️  No actions found to execute\n');
     }
+
+    console.log('-'.repeat(80));
+    console.log('✅ Observe + Act pattern completed!\n');
 
     // Capture "after" screenshot
     if (captureScreenshots) {
@@ -589,9 +608,9 @@ async function runTest() {
 
     // AI Analysis Pipeline (only if screenshots were captured)
     if (captureScreenshots && screenshotPaths.length > 0) {
-      console.log('=' .repeat(80));
+      console.log('='.repeat(80));
       console.log('🤖 STARTING AI ANALYSIS PIPELINE');
-      console.log('=' .repeat(80) + '\n');
+      console.log('='.repeat(80) + '\n');
 
       // Stage 1: Vision Model Analysis (batch mode for terminal output)
       const visionCritique = await analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey);
