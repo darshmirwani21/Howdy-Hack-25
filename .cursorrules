@@ -1,0 +1,80 @@
+# Project Testing Rules for Cursor AI
+
+## Web Application Port Configuration
+- **Always use port 3000** for building websites
+- After creating any web application, display: `🌐 Server running on http://localhost:3000`
+
+## External Program Integration
+After creating a website, run:
+```
+xyz --port 3000
+```
+This should be executed automatically after the web server is started.
+
+## Automatic Testing
+After making ANY code changes, run the appropriate test suite:
+
+### Python Files
+```
+python test_agent.py
+```
+
+### JavaScript/TypeScript Files
+```
+npm test
+```
+
+### Java Files
+```
+mvn test
+```
+
+### Go Files
+```
+go test ./...
+```
+
+### Rust Files
+```
+cargo test
+```
+
+### C/C++ Files
+```
+make test
+```
+
+### General Rule
+If unsure which test command to use, ask the user or check for:
+- package.json (Node.js) → `npm test`
+- requirements.txt or setup.py (Python) → `pytest` or `python -m pytest`
+- Cargo.toml (Rust) → `cargo test`
+- go.mod (Go) → `go test ./...`
+- pom.xml (Java/Maven) → `mvn test`
+- build.gradle (Java/Gradle) → `gradle test`
+
+## Test Verification Workflow
+1. Make the requested code changes
+2. Identify the file type and run appropriate tests
+3. If tests fail:
+   - Analyze the error output
+   - Fix the issues
+   - Re-run the tests
+   - Repeat until all tests pass
+4. Only mark the task as complete once all tests pass
+
+## Test Output Handling
+- If all tests pass: Confirm success to the user
+- If tests fail: Show the error output and explain what needs to be fixed
+
+## When to Skip Tests
+Only skip running tests if the user explicitly says:
+- "Don't run tests"
+- "Skip testing"
+- "No need to test"
+
+## Code Quality
+- Write code that passes existing tests
+- When adding new features, suggest writing new tests if none exist
+- Maintain test coverage for critical functionality
+- Follow language-specific testing best practices
