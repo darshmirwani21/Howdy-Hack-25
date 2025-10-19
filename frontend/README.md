@@ -20,15 +20,36 @@ cp env_example.txt .env
 # - BROWSERBASE_PROJECT_ID (for cloud testing)
 ```
 
-### 3. Run Basic Test
+### 3. Run Basic Test (No Web App Required)
 ```bash
+# Test internal functionality without Stagehand
 python test_basic.py
+
+# Test with Stagehand initialization (requires API keys)
+python test_basic.py --with-stagehand
 ```
 
-### 4. Run Full Test Cycle
+### 3.5. Test with Real Website (Microsoft Homepage)
 ```bash
-# With Stagehand (local)
-python test_agent.py --web-port 3000 --prompt "Test the login functionality"
+# Full test with multiple scenarios
+python test_microsoft.py
+
+# Quick test with single scenario
+python test_microsoft.py --quick
+```
+
+### 4. Run Full Test Cycle (Requires Web App + Backend)
+```bash
+# Prerequisites:
+# 1. Web app running on port 3000
+# 2. Backend running on port 443
+# 3. OPENAI_API_KEY in .env
+
+# Run full test cycle
+python test_agent.py --prompt "Test the login functionality"
+
+# Or test with a public website
+python test_agent.py --prompt "Navigate to https://example.com and test links"
 ```
 
 ## Usage Examples

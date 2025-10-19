@@ -15,9 +15,13 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
 from stagehand import Stagehand
 from stagehand.config import StagehandConfig
 from pydantic import BaseModel
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,12 +82,24 @@ class HowdyTestAgent:
         try:
             logger.info("Initializing Stagehand...")
             
+            # Get API key from environment
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required")
+            
             # Initialize Stagehand with configuration parameters directly
             config = StagehandConfig(
                env="LOCAL",
-               api_key="dummy-openai-key",
-               model_name="openai/gpt-4",
+               model_name="gpt-4o",
+               model_client_options={
+                   "apiKey": api_key,
+                   "baseURL": "https://api.openai.com/v1"
+               },
                headless=False,
+               verbose=2,
+               dom_settle_timeout_ms=3000,
+               enable_caching=False,
+               self_heal=True,
             )
             
             self.stagehand = Stagehand(config=config)
@@ -93,7 +109,9 @@ class HowdyTestAgent:
             
             logger.info("✅ Stagehand initialized successfully")
             logger.info("   Environment: LOCAL")
-            logger.info(f"   Backend API: http://localhost:{self.backend_port}/v1")
+            logger.info(f"   Model: gpt-4o")
+            logger.info(f"   API Key: ✓ Set ({api_key[:8]}...)")
+            logger.info(f"   Base URL: https://api.openai.com/v1")
             return True
             
         except Exception as e:
@@ -223,13 +241,9 @@ class HowdyTestAgent:
         results = []
         
         try:
-            # Create agent instance with configuration
+            # Create agent instance
             # API key and base URL are already configured in initialize_stagehand()
-            agent = self.stagehand.agent({
-                'provider': 'openai',
-                'model': 'gpt-4o',
-                'instructions': 'Execute web testing scenarios and report results'
-            })
+            agent = self.stagehand.agent()
             
             logger.info("Agent instance created successfully")
             
@@ -246,6 +260,7 @@ class HowdyTestAgent:
                     })
                     
                     # Store the full agent result in memory
+                    # agent_result contains screenshots taken by Stagehand automatically
                     self.execution_results.append({
                         "scenario": scenario,
                         "result": agent_result,
@@ -253,15 +268,15 @@ class HowdyTestAgent:
                         "index": i
                     })
                     
-                    # Take manual screenshot and store path
-                    screenshot_path = f"./screenshots/scenario_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                    try:
-                        await self.page.screenshot(path=screenshot_path)
-                        self.screenshots.append(screenshot_path)
-                        logger.info(f"Screenshot saved: {screenshot_path}")
-                    except Exception as screenshot_error:
-                        logger.warning(f"Could not save screenshot: {screenshot_error}")
-                        screenshot_path = None
+                    # Extract screenshot info from agent result if available
+                    screenshot_path = None
+                    if isinstance(agent_result, dict) and 'screenshots' in agent_result:
+                        # Stagehand stores screenshots in the result
+                        screenshots = agent_result.get('screenshots', [])
+                        if screenshots:
+                            screenshot_path = screenshots[-1] if isinstance(screenshots, list) else screenshots
+                            self.screenshots.append(screenshot_path)
+                            logger.info(f"Screenshot from agent: {screenshot_path}")
                     
                     # Create result summary
                     result = TestResult(
@@ -444,10 +459,9 @@ class HowdyTestAgent:
         logger.info("📤 Sending collected data to backend for analysis...")
         
         try:
-            # Prepare payload with all collected data
+            # Prepare JSON payload
             payload = {
                 "execution_results": self.execution_results,
-                "screenshot_paths": self.screenshots,
                 "observations": self.observations,
                 "metadata": {
                     "total_executions": len(self.execution_results),
@@ -458,12 +472,17 @@ class HowdyTestAgent:
                 }
             }
             
+            # Include screenshot references in payload
+            # Stagehand's auto-screenshots are already in agent_result
+            payload['screenshot_references'] = self.screenshots
+            
             logger.info(f"Payload contains:")
             logger.info(f"  - {len(self.execution_results)} execution results")
-            logger.info(f"  - {len(self.screenshots)} screenshots")
+            logger.info(f"  - {len(self.screenshots)} screenshot references")
             logger.info(f"  - {len(self.observations)} observations")
             
             # Send to backend analysis endpoint
+            # Screenshots are embedded in execution_results from Stagehand
             response = requests.post(
                 f"http://localhost:{self.backend_port}/analyze",
                 json=payload,
@@ -604,7 +623,9 @@ async def main():
     
     # Override prompt if provided via command line
     if args.prompt:
-        agent.get_ai_prompt = lambda: args.prompt
+        async def return_prompt():
+            return args.prompt
+        agent.get_ai_prompt = return_prompt
     
     try:
         # Initialize Stagehand
