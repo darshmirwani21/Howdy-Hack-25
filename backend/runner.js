@@ -2,7 +2,7 @@
 /**
  * Stagehand Browser Automation Runner with Visual UI Testing
  * 
- * CLI tool for AI-powered browser testing with screenshot capture and AI critique
+ * CLI tool for AI-powered browser testing with screenshot capture and AI analysis
  * 
  * Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots]
  */
@@ -19,6 +19,31 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
+
+// Console output capture
+let terminalOutput = [];
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn,
+  info: console.info
+};
+
+function captureConsoleOutput() {
+  ['log', 'error', 'warn', 'info'].forEach(method => {
+    console[method] = (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      terminalOutput.push(message);
+      originalConsole[method](...args);
+    };
+  });
+}
+
+function restoreConsole() {
+  Object.assign(console, originalConsole);
+}
 
 // Parse command line arguments
 function parseArguments() {
@@ -41,22 +66,16 @@ function parseArguments() {
         type: 'boolean',
         short: 's',
         default: false
-      },
-      critique: {
-        type: 'boolean',
-        short: 'c',
-        default: false
       }
     }
   });
 
   if (!values.url || !values.test) {
     console.error('❌ Error: Both --url and --test arguments are required\n');
-    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots] [--critique]\n');
+    console.log('Usage: node runner.js --url <URL> --test "<test description>" [--agent] [--screenshots]\n');
     console.log('Examples:');
     console.log('  node runner.js --url https://example.com --test "Click the login button"');
-    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --agent --screenshots');
-    console.log('  node runner.js --url https://example.com --test "Check homepage UI" --screenshots --critique\n');
+    console.log('  node runner.js --url https://example.com --test "Navigate to pricing" --agent --screenshots\n');
     process.exit(1);
   }
 
@@ -64,38 +83,61 @@ function parseArguments() {
     url: values.url,
     test: values.test,
     useAgent: values.agent,
-    captureScreenshots: values.screenshots,
-    aiCritique: values.critique
+    captureScreenshots: values.screenshots
   };
 }
 
-// Create screenshots directory
-async function ensureScreenshotsDir() {
-  const screenshotsDir = path.join(__dirname, 'screenshots');
-  try {
-    await fs.access(screenshotsDir);
-  } catch {
-    await fs.mkdir(screenshotsDir, { recursive: true });
-  }
-  return screenshotsDir;
+// Create timestamped run folder
+async function createRunFolder() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('.')[0];
+  const runFolder = path.join(__dirname, 'screenshots', `run_${timestamp}`);
+  await fs.mkdir(runFolder, { recursive: true });
+  return runFolder;
 }
 
-// Save screenshot with timestamp
-async function saveScreenshot(page, screenshotsDir, prefix, stepNumber) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `${prefix}_step${stepNumber}_${timestamp}.png`;
-  const filepath = path.join(screenshotsDir, filename);
+// Save screenshot
+async function saveScreenshot(page, runFolder, prefix, stepNumber) {
+  const filename = `${prefix}_step${stepNumber}.png`;
+  const filepath = path.join(runFolder, filename);
   
   await page.screenshot({ path: filepath, fullPage: true });
   console.log(`📸 Screenshot saved: ${filename}`);
-  return filepath;
+  return { filepath, filename };
 }
 
-// AI Critique using OpenRouter Vision Model
-async function critiqueScreenshot(screenshotPath, context, openrouterApiKey) {
+// Save terminal output to file
+async function saveTerminalOutput(runFolder, output) {
+  const filepath = path.join(runFolder, 'terminal_output.txt');
+  await fs.writeFile(filepath, output.join('\n'), 'utf-8');
+  console.log(`📝 Terminal output saved: terminal_output.txt`);
+}
+
+// Vision Model Analysis - All screenshots in one call
+async function analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey) {
   try {
-    const imageBuffer = await fs.readFile(screenshotPath);
-    const base64Image = imageBuffer.toString('base64');
+    console.log('\n🔍 Running vision model analysis on all screenshots...');
+    
+    // Read all screenshots and convert to base64
+    const imageContents = [];
+    for (const screenshotPath of screenshotPaths) {
+      const imageBuffer = await fs.readFile(screenshotPath);
+      const base64Image = imageBuffer.toString('base64');
+      imageContents.push({
+        type: 'image_url',
+        image_url: {
+          url: `data:image/png;base64,${base64Image}`
+        }
+      });
+    }
+    
+    // Create message content with prompt and all images
+    const messageContent = [
+      {
+        type: 'text',
+        text: 'critique this UI. if it is good, just say its good'
+      },
+      ...imageContents
+    ];
     
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -103,50 +145,81 @@ async function critiqueScreenshot(screenshotPath, context, openrouterApiKey) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openrouterApiKey}`,
         'HTTP-Referer': 'https://github.com/browserbase/stagehand',
-        'X-Title': 'Stagehand UI Critique'
+        'X-Title': 'Stagehand UI Analysis'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o', // Vision-capable model
+        model: 'openai/gpt-4o',
         messages: [
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `You are a UI/UX expert reviewing this screenshot. Context: ${context}
-
-Analyze the screenshot and provide:
-1. UI/UX issues (broken layouts, overlapping elements, poor contrast, etc.)
-2. Accessibility concerns
-3. Visual bugs or glitches
-4. Overall quality assessment (1-10)
-5. Specific actionable feedback
-
-Be concise but thorough.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/png;base64,${base64Image}`
-                }
-              }
-            ]
+            content: messageContent
           }
         ],
-        max_tokens: 500
+        max_tokens: 1000
       })
     });
 
     const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || JSON.stringify(data.error));
+    }
+    
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('⚠️  Failed to get AI critique:', error.message);
-    return null;
+    console.error('⚠️  Failed to get vision model critique:', error.message);
+    return 'Vision model analysis failed: ' + error.message;
+  }
+}
+
+// Summary Analysis with GPT-4o-mini
+async function generateSummary(visionCritique, terminalOutput, openrouterApiKey) {
+  try {
+    console.log('🔍 Generating summary with GPT-4o-mini...\n');
+    
+    const prompt = `You are analyzing browser testing results. Based on the screenshot feedback and terminal output, summarize what's wrong and what can be improved. If it's actually good, say that.
+
+SCREENSHOT FEEDBACK:
+${visionCritique}
+
+TERMINAL OUTPUT:
+${terminalOutput.join('\n')}`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterApiKey}`,
+        'HTTP-Referer': 'https://github.com/browserbase/stagehand',
+        'X-Title': 'Stagehand Test Summary'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 800
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || JSON.stringify(data.error));
+    }
+    
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('⚠️  Failed to generate summary:', error.message);
+    return 'Summary generation failed: ' + error.message;
   }
 }
 
 async function runTest() {
-  const { url, test, useAgent, captureScreenshots, aiCritique } = parseArguments();
+  const { url, test, useAgent, captureScreenshots } = parseArguments();
 
   // Validate environment variables
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
@@ -158,12 +231,17 @@ async function runTest() {
     process.exit(1);
   }
 
-  // Setup screenshots directory if needed
-  let screenshotsDir = null;
+  // Start capturing console output
+  captureConsoleOutput();
+
+  // Setup run folder if screenshots enabled
+  let runFolder = null;
+  let screenshotPaths = [];
   let stepCounter = 0;
+  
   if (captureScreenshots) {
-    screenshotsDir = await ensureScreenshotsDir();
-    console.log(`📁 Screenshots will be saved to: ${screenshotsDir}\n`);
+    runFolder = await createRunFolder();
+    console.log(`📁 Run folder created: ${runFolder}\n`);
   }
 
   console.log('🚀 Starting Stagehand Browser Automation');
@@ -173,7 +251,6 @@ async function runTest() {
   console.log(`🤖 Model: ${modelName}`);
   console.log(`🎯 Mode: ${useAgent ? 'Computer Use Agent (CU)' : 'Normal (single action)'}`);
   console.log(`📸 Screenshots: ${captureScreenshots ? 'Enabled' : 'Disabled'}`);
-  console.log(`🔍 AI Critique: ${aiCritique ? 'Enabled' : 'Disabled'}`);
   console.log('=' .repeat(80));
 
   // Initialize Stagehand with LOCAL environment
@@ -208,19 +285,9 @@ async function runTest() {
     // Capture "before" screenshot
     if (captureScreenshots) {
       stepCounter++;
-      console.log('\n📸 Capturing BEFORE screenshot...');
-      const beforePath = await saveScreenshot(stagehand.page, screenshotsDir, 'before', stepCounter);
-      
-      if (aiCritique) {
-        console.log('🔍 Running AI critique on initial page...\n');
-        const critique = await critiqueScreenshot(beforePath, `Initial page load: ${url}`, openrouterApiKey);
-        if (critique) {
-          console.log('═'.repeat(80));
-          console.log('🎨 UI CRITIQUE (Before Action):');
-          console.log(critique);
-          console.log('═'.repeat(80) + '\n');
-        }
-      }
+      console.log('📸 Capturing BEFORE screenshot...');
+      const { filepath } = await saveScreenshot(stagehand.page, runFolder, 'before', stepCounter);
+      screenshotPaths.push(filepath);
     }
 
     // Run the test
@@ -254,18 +321,8 @@ async function runTest() {
     if (captureScreenshots) {
       stepCounter++;
       console.log('📸 Capturing AFTER screenshot...');
-      const afterPath = await saveScreenshot(stagehand.page, screenshotsDir, 'after', stepCounter);
-      
-      if (aiCritique) {
-        console.log('🔍 Running AI critique on final state...\n');
-        const critique = await critiqueScreenshot(afterPath, `After action: ${test}`, openrouterApiKey);
-        if (critique) {
-          console.log('═'.repeat(80));
-          console.log('🎨 UI CRITIQUE (After Action):');
-          console.log(critique);
-          console.log('═'.repeat(80) + '\n');
-        }
-      }
+      const { filepath } = await saveScreenshot(stagehand.page, runFolder, 'after', stepCounter);
+      screenshotPaths.push(filepath);
     }
 
     // Give time to see the result
@@ -277,15 +334,47 @@ async function runTest() {
     if (error.stack) {
       console.error('\nStack trace:', error.stack);
     }
-    process.exit(1);
   } finally {
     // Clean up
     console.log('\n🧹 Cleaning up...');
     await stagehand.close();
-    console.log('✅ Done!');
+    console.log('✅ Browser closed\n');
+
+    // AI Analysis Pipeline (only if screenshots were captured)
+    if (captureScreenshots && screenshotPaths.length > 0) {
+      console.log('=' .repeat(80));
+      console.log('🤖 STARTING AI ANALYSIS PIPELINE');
+      console.log('=' .repeat(80) + '\n');
+
+      // Stage 1: Vision Model Analysis
+      const visionCritique = await analyzeScreenshotsWithVision(screenshotPaths, openrouterApiKey);
+      
+      console.log('═'.repeat(80));
+      console.log('👁️  VISION MODEL CRITIQUE:');
+      console.log('═'.repeat(80));
+      console.log(visionCritique);
+      console.log('═'.repeat(80) + '\n');
+
+      // Stage 2: Summary Analysis
+      const summary = await generateSummary(visionCritique, terminalOutput, openrouterApiKey);
+      
+      console.log('═'.repeat(80));
+      console.log('📋 FINAL SUMMARY:');
+      console.log('═'.repeat(80));
+      console.log(summary);
+      console.log('═'.repeat(80) + '\n');
+
+      // Save terminal output
+      await saveTerminalOutput(runFolder, terminalOutput);
+
+      // Final output
+      console.log('📁 All files saved to:', runFolder);
+    }
+
+    // Restore console
+    restoreConsole();
   }
 }
 
 // Run the test
 runTest();
-
