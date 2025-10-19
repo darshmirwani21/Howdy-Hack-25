@@ -1,123 +1,148 @@
-# Browser Automation Testing System
+# Stagehand Browser Automation
 
-Automated browser testing using Stagehand (agent mode) with OpenRouter's DeepSeek model.
-
-## Architecture
-
-```
-CLI Script → Stagehand (agent mode) → FastAPI Backend → OpenRouter (DeepSeek) → Browser Actions
-```
+Simple AI-powered browser testing using Stagehand (Node.js) with OpenRouter.
 
 ## Prerequisites
 
 - Docker and Docker Compose
-- `.env` file in the `backend/` directory with:
-  ```bash
-  OPENROUTER_API_KEY=your_key_here
-  STAGEHAND_MODEL=tngtech/deepseek-r1t-chimera:free
-  STAGEHAND_API_URL=http://localhost:443
-  ```
-- Application running on `localhost:3000` (accessible from Docker as `host.docker.internal:3000`)
+- OpenRouter API key
 
 ## Setup
 
-1. Create your `.env` file in the `backend/` directory:
-   ```bash
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your actual values
-   ```
+1. **Create `.env` file** in the `backend/` directory:
 
-2. Build the Docker container:
-   ```bash
-   docker-compose build
-   ```
+```bash
+OPENROUTER_API_KEY=your-api-key-here
+STAGEHAND_MODEL=openai/gpt-4o-mini
+```
 
-3. Start the FastAPI backend:
-   ```bash
-   docker-compose up -d
-   ```
+2. **Build the Docker container**:
+
+```bash
+docker-compose build
+```
+
+3. **Start the container**:
+
+```bash
+docker-compose up -d
+```
 
 ## Usage
 
-### Running Tests from CLI
-
-Run automated tests by providing a detailed AI-generated changelog:
+Run tests with **2 required flags** + **1 optional flag**:
+- `--url` or `-u`: Target URL
+- `--test` or `-t`: Test description
+- `--agent` or `-a`: (Optional) Use Computer Use Agent mode
 
 ```bash
-docker-compose exec stagehand-backend python /app/stagehand_runner.py "Test the login functionality after recent authentication module changes. Verify that users can successfully log in with valid credentials and see appropriate error messages for invalid ones."
+node runner.js --url "<URL>" --test "<what to test>" [--agent]
 ```
 
-### Example Test Descriptions
+### Two Modes
 
-**Basic Navigation Test:**
+**Normal Mode (without `--agent`)** - Single action:
 ```bash
-docker-compose exec stagehand-backend python /app/stagehand_runner.py "Navigate to the homepage, verify all navigation links are present and functional, and ensure the footer displays correctly."
+node runner.js --url "https://example.com" --test "Click the login button"
+```
+- Uses `page.act()` for single, precise actions
+- Fast and efficient
+- Good for known, specific tasks
+
+**Computer Use Agent Mode (with `--agent`)** - Multi-step autonomous:
+```bash
+node runner.js --url "https://example.com" --test "Navigate to pricing and compare all plans" --agent
+```
+- Uses `stagehand.agent()` for complex, multi-step tasks
+- AI figures out multiple steps autonomously
+- Good for exploratory or complex workflows
+
+### Examples
+
+**Normal Mode - Click a button:**
+```bash
+node runner.js \
+  --url "https://github.com/browserbase/stagehand" \
+  --test "Click the star button"
 ```
 
-**Form Submission Test:**
+**Normal Mode - Fill a form field:**
 ```bash
-docker-compose exec stagehand-backend python /app/stagehand_runner.py "Test the contact form submission. Fill in all required fields with valid data, submit the form, and verify a success message appears."
+node runner.js \
+  --url "https://example.com/login" \
+  --test "Type 'test@example.com' into the email field"
 ```
 
-**Complex User Flow:**
+**Agent Mode - Multi-step exploration:**
 ```bash
-docker-compose exec stagehand-backend python /app/stagehand_runner.py "Perform a complete user registration flow: navigate to signup page, fill in username, email, and password, submit the form, verify account creation confirmation, then test logging in with the new credentials."
+node runner.js \
+  --url "https://github.com/browserbase/stagehand" \
+  --test "Find the star count and latest release version" \
+  --agent
+```
+
+**Agent Mode - Complex workflow:**
+```bash
+node runner.js \
+  --url "https://example.com" \
+  --test "Navigate to pricing, find the enterprise plan, and extract all features" \
+  --agent
 ```
 
 ## How It Works
 
-1. **FastAPI Backend** (`llm_backend/server.py`):
-   - Runs on port 443
-   - Acts as an OpenAI-compatible proxy
-   - Forwards requests to OpenRouter's DeepSeek model
+1. **Stagehand** (Node.js version) - Real implementation with LOCAL mode support
+2. **Two Modes:**
+   - **Normal Mode**: Single actions with `page.act()`
+   - **Computer Use Agent Mode**: Multi-step autonomous with `stagehand.agent()`
+3. **OpenRouter** - Provides LLM capabilities (no OpenAI key needed)
+4. **Playwright** - Handles actual browser automation
+5. **Docker** - Runs everything in a container with Xvfb for headed mode
 
-2. **Stagehand Runner** (`stagehand_runner.py`):
-   - Accepts natural language test descriptions via CLI
-   - Initializes Stagehand in LOCAL mode (headed browser)
-   - Uses Stagehand's agent mode for autonomous multi-step testing
-   - Targets `http://host.docker.internal:3000`
+## Configuration
 
-3. **OpenRouter Integration**:
-   - Model: `tngtech/deepseek-r1t-chimera:free`
-   - No cost for API calls
-   - Provides LLM reasoning for browser automation
+All configuration is done via environment variables in `.env`:
 
-## Debugging
+- `OPENROUTER_API_KEY` - Your OpenRouter API key (required)
+- `STAGEHAND_MODEL` - Model to use (default: `openai/gpt-4o-mini`)
 
-### View Logs
-```bash
-docker-compose logs -f stagehand-backend
-```
+### Recommended Models
 
-### Access Container Shell
-```bash
-docker-compose exec stagehand-backend /bin/bash
-```
+**Paid (best quality):**
+- `openai/gpt-4o-mini` (cheap and good)
+- `openai/gpt-4o` (best quality)
+- `anthropic/claude-3.5-sonnet`
 
-### Test FastAPI Backend
-```bash
-curl http://localhost:443/
-```
+**Free (for testing):**
+- `google/gemini-2.0-flash-exp:free`
+- `tngtech/deepseek-r1t-chimera:free`
 
 ## Troubleshooting
 
-**Issue: Can't connect to localhost:3000**
-- Ensure your app is running on port 3000
-- Docker uses `host.docker.internal` to access host machine
+**Check container logs:**
+```bash
+docker-compose logs stagehand
+```
 
-**Issue: OpenRouter API errors**
-- Verify `OPENROUTER_API_KEY` is set correctly in `.env`
-- Check OpenRouter service status
+**Access container shell:**
+```bash
+docker-compose exec stagehand sh
+```
 
-**Issue: Browser doesn't display in headed mode**
-- Xvfb is running in the container for virtual display
-- Check `DISPLAY=:99` environment variable
+**Rebuild after changes:**
+```bash
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
 
-## Files
+## Architecture
 
-- `llm_backend/server.py` - FastAPI backend (OpenRouter proxy)
-- `stagehand_runner.py` - CLI script for running tests
-- `llm_backend/Dockerfile` - Docker configuration
-- `docker-compose.yml` - Docker orchestration
-- `llm_backend/requirements.txt` - Python dependencies
+```
+CLI (2 flags) → Stagehand (LOCAL mode) → OpenRouter API → Browser Actions
+```
 
+- **No Browserbase** - Runs locally in Docker
+- **No hardcoded values** - All config in .env
+- **Simple CLI** - Just URL and test description
+- **Clean setup** - Minimal dependencies

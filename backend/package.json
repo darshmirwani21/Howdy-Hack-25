@@ -1,0 +1,17 @@
+{
+  "name": "stagehand-automation",
+  "version": "1.0.0",
+  "description": "Browser automation using Stagehand with OpenRouter",
+  "main": "runner.js",
+  "type": "module",
+  "scripts": {
+    "test": "node runner.js"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^2.5.0",
+    "dotenv": "^16.4.5"
+  },
+  "author": "",
+  "license": "MIT"
+}
+
