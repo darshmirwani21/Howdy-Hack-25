@@ -540,7 +540,7 @@ async function runTest() {
           
           // Wait a bit between actions
           if (i < observations.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
         } catch (error) {
           console.error(`   ❌ Action ${i + 1} failed:`, error.message);
